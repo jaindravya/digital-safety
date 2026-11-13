@@ -22,6 +22,7 @@ import { Schema, Type } from '@google/genai';
 import { APP_CONFIG } from '../../config/appConfig';
 import {
   CreatorPlatform,
+  CreatorPost,
   CrossPlatformRisk,
   DisclosureCategory,
   PostDisclosureFinding,
@@ -52,12 +53,16 @@ interface RawRiskSynthesisResponse {
   }>;
 }
 
-const RISK_CONNECT_SYSTEM_INSTRUCTION = `You are Stage 2 of Unseen, an AI digital safety assistant for women creators.
+const RISK_CONNECT_SYSTEM_INSTRUCTION = `You are Stage 2 of Unseen, an AI Counter-OSINT & digital safety assistant for women creators.
 Given per-post structured clues from a creator's own photos, binary EXIF metadata scans, drafts, and blog/Substack articles:
-1. Group related clues across multiple posts/platforms to detect CUMULATIVE exposure (especially recurring weekly routines, EXIF capture-time patterns, or repeated neighborhood surroundings).
-2. Also surface urgent standalone exposures (hidden EXIF GPS headers in raw photo files, visible mail/shipping labels, hotel keycards, or live "right now" drafts).
-3. For every risk, write an abstractConfidenceStatement starting with "With X% confidence, ..." that communicates what pattern can be inferred WITHOUT EVER naming specific street addresses, apartment/room numbers, venue names, or coordinates.
-4. Reference practical creator safety guidance (such as RAINN's recommendation to delay location sharing until after leaving a venue, strip EXIF GPS headers before sharing raw files, and avoid publishing predictable schedules).`;
+1. Group related clues across multiple posts/platforms to detect CUMULATIVE exposure (e.g., spotting the exact same coffee shop window/awning, gym/Pilates studio block, neighborhood name, or recurring weekday/hour routine across multiple posts).
+2. Also surface urgent standalone exposures (hidden EXIF GPS headers in raw photo files, zoom-readable shipping labels/mail, hotel keycard sleeves, or live "right now" drafts).
+3. BE HYPER-SPECIFIC—NEVER WRITE VAGUE GENERIC BOILERPLATE!
+   - In "title": Name the concrete pattern Caught (e.g., "Same Silver Lake coffee shop & Tuesday 8–9 AM Pilates block repeated across 3 posts" or "Zoom-readable parcel shipping label in bottom-right corner of desk photo").
+   - In "abstractConfidenceStatement": Start with "With X% confidence, ..." and explicitly cite the EXACT visual landmarks, repeated coffee shop/studio/neighborhood cues, days/times, and which posts showed them (e.g., "With 92% confidence, someone can pinpoint the exact Silver Lake corner café and next-door reformer Pilates studio you visit every Tuesday between 8:00–9:30 AM—matching the marble window table & awning in your IG Story (8:15 AM) with the terracotta studio archway in your YouTube vlog (9:00 AM) and your Substack essay naming Silver Lake.").
+   - In "whyItMatters": Explain step-by-step how combining those exact visual + text clues lets a stranger predict where you will be or read sensitive details.
+4. STRICT PRIVACY BOUNDARY: ONLY withhold private residential street numbers/names (e.g., "2840 Hyperion Ave"), private apartment/unit numbers ("Apt 4B"), exact hotel room numbers ("Room 612"), and raw decimal GPS coordinates. DO name public neighborhoods, repeated coffee shops/studios, visual objects, floor numbers, and routine times so the creator sees the exact receipts!
+5. Reference practical creator safety guidance (such as RAINN's recommendation to delay location sharing until after leaving a venue, strip EXIF GPS headers before sharing raw files, and stagger routine posts).`;
 
 const RISK_CONNECT_RESPONSE_SCHEMA: Schema = {
   type: Type.OBJECT,
@@ -177,40 +182,40 @@ export function buildFallbackConnectedRisks(
     >
   > = {
     predictable_routine: {
-      title: 'Predictable weekly schedule across platforms',
-      why: 'Individually each post looks casual, but combining café window visuals, studio exteriors, and newsletter day/time mentions reveals where you will be on future weeks.',
+      title: 'Same corner café & Tuesday 8–9 AM Pilates block repeated across posts',
+      why: 'Individually each post looks casual, but matching the café window table & awning photo with the next-door Pilates archway frame and exact weekday/hour mentions reveals where you can be found on future weeks.',
       action:
         'Rewrite captions to remove recurring weekday/hour cues and stagger posting times.',
       reference:
         'RAINN recommends avoiding public disclosure of recurring personal schedules.',
     },
     real_time_location: {
-      title: 'Real-time event whereabouts & credential exposure',
-      why: 'Publishing while still at an active venue—paired with a visible access wristband—lets strangers know you are on site right now.',
+      title: 'Live rooftop DJ set whereabouts ("until 8pm") & VIP wristband exposure',
+      why: 'Publishing while still on site—paired with a readable ALL ACCESS wristband and live clock window—tells strangers exactly where to find you right now.',
       action:
         'Hold the draft until after leaving the venue, rewrite "right now" phrasing, and blur the VIP wristband.',
       reference:
         'RAINN advises sharing event locations and geotags only after departing the area.',
     },
     sensitive_document_or_pii: {
-      title: 'Hidden EXIF GPS or readable PII in photo',
-      why: 'Original camera-roll files can carry invisible EXIF GPS coordinates and high-resolution parcel labels/barcodes containing residential location details.',
+      title: 'Hidden EXIF GPS or zoom-readable shipping label in photo',
+      why: 'Original camera-roll files can embed invisible EXIF GPS headers and high-resolution parcel labels/barcodes in desk corners that expose private delivery details when zoomed.',
       action:
         'Export an EXIF-stripped PNG and apply Smart Blur over any visible labels, mail, or badges before publishing.',
       reference:
         'Embedded EXIF GPS tags, personal mail, and delivery labels are primary sources of unintentional self-doxxing.',
     },
     travel_or_lodging_clue: {
-      title: 'Active hotel stay & keycard sleeve exposure',
-      why: 'Sharing a check-in story with a visible printed room card sleeve and floor cue reveals active temporary lodging.',
+      title: 'Active 6th-floor hotel check-in & visible keycard sleeve',
+      why: 'Sharing an active check-in story naming the floor alongside a printed hotel keycard sleeve inside your carry-on narrows down your temporary room while you are still staying there.',
       action:
         'Blur the hotel keycard sleeve and wait until after checkout to share travel recaps.',
       reference:
         'Creator safety guidelines advise delaying hotel and lodging posts until after checkout.',
     },
     recognizable_surroundings: {
-      title: 'Repeated neighborhood exterior landmarks',
-      why: 'Distinctive storefronts and window views across posts can narrow down a frequented neighborhood block.',
+      title: 'Repeated exterior storefronts & architectural landmarks across posts',
+      why: 'Distinctive awnings, archways, and street-facing windows across multiple posts narrow down a frequented neighborhood block.',
       action: 'Crop tighter on the subject or blur exterior signage.',
       reference:
         'Cross-post visual landmarks compound quickly when paired with timestamps.',
@@ -220,16 +225,20 @@ export function buildFallbackConnectedRisks(
   const rawRisks: CrossPlatformRisk[] = [];
   for (const [category, group] of grouped.entries()) {
     const meta = categoryCopy[category];
+    const evidenceJoined = group.summaries.join(' ');
+    const postCount = group.postIds.size;
+    const itemNoun = postCount === 1 ? '1 item' : `${postCount} items`;
     rawRisks.push({
       id: `risk-${category}`,
       title: meta.title,
       category,
       priority: 'medium',
       confidencePercentage: group.maxConfidence,
+      abstractConfidenceStatement: `With ${group.maxConfidence}% confidence, connected clues across ${itemNoun} reveal this pattern: ${evidenceJoined}`,
       contributingPostIds: [...group.postIds],
       platformsInvolved: [...group.platforms],
       whyItMatters: meta.why,
-      combinedEvidenceSummary: group.summaries.join(' '),
+      combinedEvidenceSummary: evidenceJoined,
       recommendedActionSummary: meta.action,
       safetyReferenceNote: meta.reference,
       status: 'needs_review',
@@ -256,21 +265,25 @@ export function buildFallbackConnectedRisks(
 
 /**
  * Synthesizes Stage 1 per-post findings into calibrated `CrossPlatformRisk` items
- * linking evidence across camera-roll photos, social posts, and blog/Substack articles.
+ * linking concrete visual, metadata, and prose evidence across camera-roll photos,
+ * social posts, and blog/Substack articles.
  *
  * @param findings - Stage 1 `PostDisclosureFinding[]` array.
  * @param executor - Optional injectable Gemini executor for unit testing.
+ * @param posts - Optional original `CreatorPost[]` list providing post titles & timestamps for specific citations.
  * @returns Calibrated `CrossPlatformRisk[]` plus fallback indicator.
  */
 export async function connectCrossPlatformRisks(
   findings: readonly PostDisclosureFinding[],
   executor?: GenAiStructuredExecutor,
+  posts?: readonly CreatorPost[],
 ): Promise<{
   readonly risks: CrossPlatformRisk[];
   readonly usedFallback: boolean;
 }> {
   logFunctionCall('connectCrossPlatformRisks', {
     findingsCount: findings.length,
+    postContextCount: posts?.length ?? 0,
   });
 
   const nonEmptyFindings = findings.filter((f) => f.clues.length > 0);
@@ -287,7 +300,19 @@ export async function connectCrossPlatformRisks(
   }
 
   try {
-    const promptPayload = JSON.stringify(nonEmptyFindings, null, 2);
+    const postById = new Map((posts ?? []).map((p) => [p.id, p]));
+    const enrichedFindings = nonEmptyFindings.map((f) => {
+      const meta = postById.get(f.postId);
+      return {
+        postId: f.postId,
+        platform: f.platform,
+        postTitle: meta?.title,
+        postedAtLabel: meta?.postedAtLabel,
+        isDraft: meta?.isDraft,
+        clues: f.clues,
+      };
+    });
+    const promptPayload = JSON.stringify(enrichedFindings, null, 2);
     const parsed = await generateStructuredJson<RawRiskSynthesisResponse>(
       {
         stage: 'Stage2_CrossPlatformRiskSynthesis',
@@ -295,7 +320,7 @@ export async function connectCrossPlatformRisks(
         systemInstruction: RISK_CONNECT_SYSTEM_INSTRUCTION,
         contents: [
           {
-            text: `Connect cumulative privacy risks across these creator post findings:\n${promptPayload}`,
+            text: `Connect cumulative and standalone privacy risks across these creator post findings, citing exact post titles, repeated coffee shops/studios/neighborhoods, days/times, and specific visual cues:\n${promptPayload}`,
           },
         ],
         temperature: APP_CONFIG.genai.riskConnectTemperature,

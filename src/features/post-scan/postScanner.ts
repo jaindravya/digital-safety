@@ -67,18 +67,20 @@ interface RawModelScanResponse {
   }>;
 }
 
-const POST_SCAN_SYSTEM_INSTRUCTION = `You are Stage 1 of Unseen, a defensive privacy self-auditor for women creators.
-Inspect the creator's own photo (if attached), binary EXIF metadata summary (if detected), caption/article text, and timestamp.
-Identify unintended privacy disclosures across these categories ONLY:
-- predictable_routine (recurring days/times, habitual cafés, gyms, studios, or hidden EXIF capture-time patterns)
-- real_time_location ("right now", live set/event cues, active check-ins)
-- sensitive_document_or_pii (hidden EXIF GPS headers, visible shipping labels, mail, barcodes, IDs, event badges, laptop/mirror reflections)
-- travel_or_lodging_clue (hotel keycard sleeves, room/floor cues, Wi-Fi codes)
-- recognizable_surroundings (distinctive exterior signage, awnings, street-level windows)
+const POST_SCAN_SYSTEM_INSTRUCTION = `You are Stage 1 of Unseen, a sharp, detail-oriented multimodal privacy self-auditor for women content creators.
+Inspect EVERY detail of the creator's own photo (foreground, desk corners, cups/packaging, window views, awnings, storefronts, architectural features, mirrors/sunglasses reflections, laptop screens, wristbands, keycards, mail/barcodes), binary EXIF metadata summary (if detected), caption/article text, and timestamp.
 
-CRITICAL SAFETY RULES:
-1. NEVER repeat or output exact street addresses, apartment numbers, hotel room numbers, venue names, or GPS coordinates in your summary or labels. Describe the OBJECT OR METADATA TYPE instead (e.g., "Visible parcel shipping label with residential address in lower-right corner" or "Hidden EXIF GPS location header embedded in raw photo file").
-2. Whenever a visual object should be blurred/cropped (mail, label, keycard, wristband, street sign), return a boundingBox in normalized 0..1000 coordinates [ymin, xmin, ymax, xmax].`;
+Identify unintended privacy disclosures across these categories ONLY:
+- predictable_routine (recurring weekdays/hours, repeated coffee shops, Pilates/gym studios, run clubs, or hidden EXIF capture-time patterns)
+- real_time_location ("right now", "until 8pm", live DJ set/event cues, active check-ins while still on site)
+- sensitive_document_or_pii (hidden EXIF GPS headers, zoom-readable shipping labels, mail, barcodes, IDs, VIP credentials, laptop/mirror reflections)
+- travel_or_lodging_clue (hotel keycard sleeves, floor numbers, room layout/views during an active stay, Wi-Fi codes)
+- recognizable_surroundings (distinctive exterior signage, striped awnings, terracotta archways, street-level windows, skyline angles)
+
+SPECIFICITY & SAFETY RULES:
+1. BE CONCRETE AND SPECIFIC—NOT VAGUE! Explicitly point out the exact visual cues, neighborhood names (e.g., "Silver Lake", "DTLA"), coffee shop/studio features (e.g., "marble corner window table overlooking a green awning and palm-lined sidewalk", "terracotta archway outside the reformer Pilates studio"), exact days/times ("Tuesdays 8:00–9:00 AM"), and exact frame positions ("white parcel shipping label in the lower-right corner next to the iced coffee").
+2. ONLY withhold private residential street numbers/names (e.g., "1428 Sunset Blvd"), private apartment/unit numbers ("Apt 4B"), exact hotel room numbers ("Room 612"), and raw decimal GPS coordinates. Never censor public neighborhood names, venue types, architectural details, or routine timestamps—the creator needs to see the exact clues that gave them away!
+3. Whenever a visual object should be blurred/cropped (mail, shipping label, barcode, keycard sleeve, wristband, street sign), return a tight boundingBox in normalized 0..1000 coordinates [ymin, xmin, ymax, xmax] with a specific label.`;
 
 const POST_SCAN_RESPONSE_SCHEMA: Schema = {
   type: Type.OBJECT,
@@ -281,11 +283,15 @@ export function buildHeuristicPostFinding(
     heuristicClues.push({
       category: 'predictable_routine',
       summary:
-        'Discloses a recurring weekday morning routine linking a neighborhood café and nearby fitness studio.',
+        post.platform === 'substack'
+          ? 'Newsletter prose explicitly states sitting at the exact same Silver Lake corner café window seat every Tuesday from 8:00 to 9:00 AM before movement class.'
+          : post.platform === 'youtube'
+            ? 'Vlog frame shows the terracotta archway entrance of the 9:00 AM Tuesday reformer Pilates studio and confirms it is on the same block as the morning coffee spot.'
+            : 'Story pairs an 8:15 AM Tuesday timestamp with a marble corner window table overlooking a distinctive café awning before heading next door to Pilates.',
       sourceModality: post.imageDataUrl ? 'combined' : 'caption',
-      confidencePercentage: 89,
-      timeCue: 'Recurring Tuesday morning window (8:00–9:30 AM)',
-      placeTypeCue: 'Neighborhood corner café & reformer Pilates block',
+      confidencePercentage: 91,
+      timeCue: 'Every Tuesday · 8:00–9:30 AM',
+      placeTypeCue: 'Silver Lake corner café window & next-door Pilates archway',
     });
   }
 
@@ -293,10 +299,10 @@ export function buildHeuristicPostFinding(
     heuristicClues.push({
       category: 'sensitive_document_or_pii',
       summary:
-        'Visible parcel shipping label in the lower-right corner exposes recipient name and residential delivery details.',
+        'Zoom-readable white parcel shipping label and barcode sit in the bottom-right corner of the desk flatlay next to the iced coffee (private street address withheld).',
       sourceModality: 'visual',
       confidencePercentage: 95,
-      placeTypeCue: 'Home studio workspace',
+      placeTypeCue: 'Bottom-right corner of home studio desk',
       boundingBox: {
         ymin: 600,
         xmin: 535,
@@ -311,11 +317,11 @@ export function buildHeuristicPostFinding(
     heuristicClues.push({
       category: 'travel_or_lodging_clue',
       summary:
-        'Active hotel check-in post includes a visible printed keycard sleeve and floor reference while still staying on property.',
+        'Live weekend check-in story names the 6th floor while a printed hotel keycard sleeve sits visibly open inside the cream carry-on suitcase.',
       sourceModality: 'combined',
       confidencePercentage: 88,
-      timeCue: 'Active weekend stay',
-      placeTypeCue: 'Boutique hotel room',
+      timeCue: 'Active weekend stay (currently checked in)',
+      placeTypeCue: '6th-floor boutique hotel room',
       boundingBox: {
         ymin: 680,
         xmin: 455,
@@ -330,18 +336,18 @@ export function buildHeuristicPostFinding(
     heuristicClues.push({
       category: 'real_time_location',
       summary:
-        'Draft announces real-time presence at an active rooftop venue while displaying an artist VIP access credential.',
+        'Draft broadcasts live presence at a DTLA sunset rooftop DJ booth ("right now until 8pm") while showing an ALL ACCESS VIP wristband in the lower-left foreground.',
       sourceModality: 'combined',
       confidencePercentage: 94,
-      timeCue: 'Live / currently on site until 8:00 PM',
-      placeTypeCue: 'Rooftop lounge & DJ booth',
+      timeCue: 'Live right now until 8:00 PM',
+      placeTypeCue: 'DTLA rooftop DJ booth',
       boundingBox: post.imageDataUrl
         ? {
             ymin: 725,
             xmin: 65,
             ymax: 915,
             xmax: 520,
-            label: 'VIP event credential wristband',
+            label: 'ALL ACCESS VIP wristband',
           }
         : undefined,
     });

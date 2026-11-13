@@ -75,6 +75,7 @@ export async function runFullPrivacyAudit(params: {
   const stage2 = await connectCrossPlatformRisks(
     stage1.findings,
     params.executor,
+    params.posts,
   );
   const { score, band } = calculateOverallExposureScore(stage2.risks);
   const bestPractices = buildBestPracticesForRisks(stage2.risks);
