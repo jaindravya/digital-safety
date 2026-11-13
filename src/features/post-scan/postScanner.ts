@@ -33,6 +33,7 @@ import {
   CreatorPost,
   DisclosureCategory,
   ExifPrivacyScanSummary,
+  NormalizedBoundingBox,
   PostDisclosureClue,
   PostDisclosureFinding,
 } from '../../domain/privacyTypes';
@@ -80,7 +81,9 @@ Identify unintended privacy disclosures across these categories ONLY:
 SPECIFICITY & SAFETY RULES:
 1. BE CONCRETE AND SPECIFIC—NOT VAGUE! Explicitly point out the exact visual cues, neighborhood names (e.g., "Silver Lake", "DTLA"), coffee shop/studio features (e.g., "marble corner window table overlooking a green awning and palm-lined sidewalk", "terracotta archway outside the reformer Pilates studio"), exact days/times ("Tuesdays 8:00–9:00 AM"), and exact frame positions ("white parcel shipping label in the lower-right corner next to the iced coffee").
 2. ONLY withhold private residential street numbers/names (e.g., "1428 Sunset Blvd"), private apartment/unit numbers ("Apt 4B"), exact hotel room numbers ("Room 612"), and raw decimal GPS coordinates. Never censor public neighborhood names, venue types, architectural details, or routine timestamps—the creator needs to see the exact clues that gave them away!
-3. Whenever a visual object should be blurred/cropped (mail, shipping label, barcode, keycard sleeve, wristband, street sign), return a tight boundingBox in normalized 0..1000 coordinates [ymin, xmin, ymax, xmax] with a specific label.`;
+3. WHEN TO RETURN A boundingBox vs. OMIT IT (CRITICAL):
+   - ONLY return a boundingBox for SMALL, INCIDENTAL PII OBJECTS that make sense to blur: shipping labels, mail/envelopes, barcodes, hotel keycard sleeves, IDs/badges/wristbands, license plates, laptop/phone screens, or small residential unit/house numbers.
+   - NEVER return a boundingBox for famous landmarks (like the Eiffel Tower, Hollywood Sign, bridges, monuments), skylines, whole buildings, café awnings/archways, or wide background scenery! Blurring a major landmark ruins the photo for no reason—omit boundingBox on landmarks/venues so Stage 3 recommends delaying the post by a few hours or days after leaving instead.`;
 
 const POST_SCAN_RESPONSE_SCHEMA: Schema = {
   type: Type.OBJECT,
@@ -126,6 +129,73 @@ const POST_SCAN_RESPONSE_SCHEMA: Schema = {
   },
   required: ['clues'],
 };
+
+/**
+ * Determines whether a candidate bounding box represents a small, incidental PII
+ * object worth Smart Blurring (labels, mail, keycards, badges, wristbands, plates,
+ * screens) rather than a large landmark, monument, skyline, or whole building.
+ *
+ * @param box - Candidate `NormalizedBoundingBox` in `0..1000` coordinates.
+ * @param category - Associated `DisclosureCategory` of the clue.
+ * @returns `true` if the box should be auto-suggested for Smart Blur; `false` if blurring makes no sense.
+ */
+export function isSmallRedactablePiiBox(
+  box: NormalizedBoundingBox,
+  category?: DisclosureCategory,
+): boolean {
+  const widthNorm = Math.abs(box.xmax - box.xmin) / APP_CONFIG.genai.boundingBoxCoordinateScale;
+  const heightNorm = Math.abs(box.ymax - box.ymin) / APP_CONFIG.genai.boundingBoxCoordinateScale;
+  const areaRatio = widthNorm * heightNorm;
+
+  logFunctionCall('isSmallRedactablePiiBox', {
+    label: box.label,
+    category: category ?? null,
+    areaRatio: Number(areaRatio.toFixed(3)),
+  });
+
+  if (areaRatio <= 0 || areaRatio > APP_CONFIG.redaction.maxAutoBlurAreaRatio) {
+    return false;
+  }
+
+  if (APP_CONFIG.redaction.nonBlurLandmarkLabelPattern.test(box.label)) {
+    return false;
+  }
+
+  if (
+    category === 'recognizable_surroundings' &&
+    !/\b(label|mail|barcode|badge|wristband|lanyard|keycard|id|card|passport|ticket|boarding|plate|screen|number|apt|address)\b/i.test(
+      box.label,
+    )
+  ) {
+    return false;
+  }
+
+  return true;
+}
+
+/**
+ * Strips impractical landmark/scenery bounding boxes from Stage 1 clues while keeping
+ * the underlying clue text intact so Stage 2 & Stage 3 recommend delayed posting instead.
+ *
+ * @param clues - Candidate `PostDisclosureClue[]` items.
+ * @returns Sanitized clues where `boundingBox` only appears on small redactable PII items.
+ */
+export function filterNonLandmarkBoundingBoxes(
+  clues: readonly PostDisclosureClue[],
+): PostDisclosureClue[] {
+  logFunctionCall('filterNonLandmarkBoundingBoxes', { clueCount: clues.length });
+
+  return clues.map((clue) => {
+    if (!clue.boundingBox) {
+      return clue;
+    }
+    if (isSmallRedactablePiiBox(clue.boundingBox, clue.category)) {
+      return clue;
+    }
+    const { boundingBox: _dropped, ...rest } = clue;
+    return rest;
+  });
+}
 
 /**
  * Resolves the complete zero-PII EXIF metadata summary for a `CreatorPost` by combining
@@ -437,7 +507,9 @@ export async function scanSingleCreatorPost(
       finding: {
         postId: post.id,
         platform: post.platform,
-        clues: mergeExifCluesIntoModelClues(parsed.clues ?? [], exifClues),
+        clues: filterNonLandmarkBoundingBoxes(
+          mergeExifCluesIntoModelClues(parsed.clues ?? [], exifClues),
+        ),
       },
       usedFallback: false,
     };

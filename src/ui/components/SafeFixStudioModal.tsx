@@ -277,8 +277,8 @@ export function SafeFixStudioModal(
           <div style={{ padding: '48px 16px', textAlign: 'center' }}>
             <Sparkles size={28} color="var(--card-plum)" />
             <p style={{ fontWeight: 700, marginTop: '10px', color: 'var(--card-ink)' }}>
-              Gemini is crafting voice-preserving rewrites &amp; redaction
-              boxes…
+              Gemini is crafting safer post timing &amp; voice-preserving
+              rewrites…
             </p>
           </div>
         ) : (
@@ -300,35 +300,58 @@ export function SafeFixStudioModal(
                     }}
                   >
                     <strong style={{ fontSize: '0.84rem', color: 'var(--card-ink)' }}>
-                      Visual Privacy Preview
+                      {activeBoxes.length > 0
+                        ? 'Visual Privacy Preview'
+                        : 'Photo Preview (No Blur Needed)'}
                     </strong>
 
-                    <div className="unseen-mono-track">
-                      <button
-                        type="button"
-                        onClick={() => setViewMode('compare')}
-                        className={`unseen-mono-option ${
-                          viewMode === 'compare' ? 'active' : ''
-                        }`}
-                        style={{ minHeight: '30px', padding: '4px 12px', fontSize: '0.72rem' }}
-                      >
-                        <Eye size={12} />
-                        <span>Before / After</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setViewMode('after')}
-                        className={`unseen-mono-option ${
-                          viewMode === 'after' ? 'active' : ''
-                        }`}
-                        style={{ minHeight: '30px', padding: '4px 12px', fontSize: '0.72rem' }}
-                      >
-                        <span>Safe Only</span>
-                      </button>
-                    </div>
+                    {activeBoxes.length > 0 && (
+                      <div className="unseen-mono-track">
+                        <button
+                          type="button"
+                          onClick={() => setViewMode('compare')}
+                          className={`unseen-mono-option ${
+                            viewMode === 'compare' ? 'active' : ''
+                          }`}
+                          style={{ minHeight: '30px', padding: '4px 12px', fontSize: '0.72rem' }}
+                        >
+                          <Eye size={12} />
+                          <span>Before / After</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setViewMode('after')}
+                          className={`unseen-mono-option ${
+                            viewMode === 'after' ? 'active' : ''
+                          }`}
+                          style={{ minHeight: '30px', padding: '4px 12px', fontSize: '0.72rem' }}
+                        >
+                          <span>Safe Only</span>
+                        </button>
+                      </div>
+                    )}
                   </div>
 
-                  {viewMode === 'compare' ? (
+                  {activeBoxes.length === 0 && (
+                    <div
+                      style={{
+                        background: 'var(--status-low-bg)',
+                        border: '1px solid var(--status-low-border)',
+                        color: 'var(--status-low-ink)',
+                        borderRadius: '10px',
+                        padding: '10px 12px',
+                        fontSize: '0.77rem',
+                        lineHeight: 1.45,
+                        fontWeight: 600,
+                      }}
+                    >
+                      Keep your photo unblurred! There’s no point blurring big
+                      landmarks or scenery—just wait a few hours or days after
+                      leaving before posting, and use a non-real-time caption.
+                    </div>
+                  )}
+
+                  {activeBoxes.length > 0 && viewMode === 'compare' ? (
                     <div
                       style={{
                         display: 'grid',
@@ -535,8 +558,46 @@ export function SafeFixStudioModal(
               )}
             </div>
 
-            {/* Right Column: Voice-Preserving Caption Rewrites + Timing */}
+            {/* Right Column: Prominent Timing Guidance + Voice-Preserving Caption Rewrites */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              {props.fixPlan && (
+                <div
+                  className="unseen-well"
+                  style={{
+                    display: 'flex',
+                    gap: '10px',
+                    alignItems: 'flex-start',
+                    fontWeight: 700,
+                    fontSize: '0.82rem',
+                    color: 'var(--card-ink)',
+                    background: 'var(--card-cream)',
+                    border: '1.5px solid var(--card-ink)',
+                    padding: '12px 14px',
+                  }}
+                >
+                  <Clock
+                    size={17}
+                    color="var(--card-plum)"
+                    style={{ flexShrink: 0, marginTop: '2px' }}
+                    aria-hidden="true"
+                  />
+                  <div>
+                    <div
+                      style={{
+                        fontSize: '0.68rem',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.06em',
+                        color: 'var(--card-plum)',
+                        marginBottom: '2px',
+                      }}
+                    >
+                      When to Post Safely
+                    </div>
+                    <span>{props.fixPlan.timingRecommendation}</span>
+                  </div>
+                </div>
+              )}
+
               <div
                 className="unseen-white-tile"
                 style={{
@@ -676,27 +737,23 @@ export function SafeFixStudioModal(
                 </div>
               </div>
 
-              {props.fixPlan && (
+              {props.fixPlan && props.fixPlan.plainLanguageChecklist.length > 0 && (
                 <div
                   className="unseen-well"
                   style={{
+                    fontSize: '0.77rem',
+                    color: 'var(--card-ink-secondary)',
                     display: 'flex',
-                    gap: '8px',
-                    alignItems: 'flex-start',
-                    fontWeight: 700,
-                    fontSize: '0.8rem',
-                    color: 'var(--card-ink)',
+                    flexDirection: 'column',
+                    gap: '4px',
                   }}
                 >
-                  <Clock
-                    size={16}
-                    color="var(--card-plum)"
-                    style={{ flexShrink: 0, marginTop: '2px' }}
-                    aria-hidden="true"
-                  />
-                  <span>
-                    Recommended Timing: {props.fixPlan.timingRecommendation}
-                  </span>
+                  <strong style={{ color: 'var(--card-ink)', fontSize: '0.74rem' }}>
+                    Quick Pre-Post Steps:
+                  </strong>
+                  {props.fixPlan.plainLanguageChecklist.map((step, idx) => (
+                    <div key={idx}>• {step}</div>
+                  ))}
                 </div>
               )}
 

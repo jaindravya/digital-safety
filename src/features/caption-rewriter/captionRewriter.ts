@@ -33,6 +33,7 @@ import {
   assertOwnershipAttestation,
   OwnershipAttestation,
 } from '../guardrails/ownershipConsent';
+import { isSmallRedactablePiiBox } from '../post-scan/postScanner';
 import {
   GenAiStructuredExecutor,
   generateStructuredJson,
@@ -53,11 +54,13 @@ interface RawFixPlanResponse {
 
 const CAPTION_REWRITE_SYSTEM_INSTRUCTION = `You are Stage 3 of Unseen, a creator-friendly privacy studio assistant.
 Rewrite the creator's caption into 3 natural alternatives that preserve her warm, authentic creator personality while removing:
-- real-time location cues ("right now", "until 8pm", "come find me")
+- real-time location cues ("right now", "until 8pm", "here today", "come find me") by shifting into a past-tense recap or timeless reflection
 - recurring weekly day/hour routines ("every Tuesday at 8am")
-- references to mail, apartment/floor numbers, or hotel check-ins.
+- references to mail, apartment/floor numbers, or active hotel check-ins.
 
-CRITICAL SAFETY RULE: Never include street addresses, room numbers, venue names, or coordinates in any option or explanation.`;
+PRACTICAL LANDMARK & TIMING RULE:
+- When Visual Regions Flagged for Blur is "None (keep photo unblurred)"—such as photos featuring famous landmarks (like the Eiffel Tower), skylines, bridges, or recognizable cafés—NEVER tell the creator to blur or crop out the landmark! There is no point blurring a major landmark; instead, set "timingRecommendation" and "plainLanguageChecklist" to clearly advise NOT posting in real time (wait a few hours or a couple of days until after leaving the area or trip before posting).
+- CRITICAL SAFETY RULE: Never include private residential street addresses, apartment/room numbers, or raw GPS coordinates in any option or explanation.`;
 
 const CAPTION_REWRITE_RESPONSE_SCHEMA: Schema = {
   type: Type.OBJECT,
@@ -104,8 +107,14 @@ export function extractRedactionBoxesFromFinding(
   }
 
   return postFinding.clues
-    .map((clue) => clue.boundingBox)
-    .filter((box): box is NormalizedBoundingBox => Boolean(box));
+    .filter(
+      (clue): clue is PostDisclosureFinding['clues'][number] & {
+        readonly boundingBox: NormalizedBoundingBox;
+      } =>
+        Boolean(clue.boundingBox) &&
+        isSmallRedactablePiiBox(clue.boundingBox!, clue.category),
+    )
+    .map((clue) => clue.boundingBox);
 }
 
 /**
@@ -158,12 +167,19 @@ export function buildFallbackFixPlan(
         ],
         suggestedRegionsToRedact: redactionBoxes,
         timingRecommendation:
-          'Publish tomorrow afternoon (at least 12–24 hours after leaving the venue).',
-        plainLanguageChecklist: [
-          'Apply Smart Blur over the VIP access wristband in the lower-left corner',
-          'Switch caption from live "right now" phrasing to a past-tense recap',
-          'Wait until after departing the venue before publishing',
-        ],
+          'Do not post in real time—wait a few hours or 12–24 hours until after you have left the venue.',
+        plainLanguageChecklist:
+          redactionBoxes.length > 0
+            ? [
+                'Apply Smart Blur over the small credential/badge in frame',
+                'Switch caption from live "right now" phrasing to a past-tense recap',
+                'Wait until a few hours or days after departing the area before publishing',
+              ]
+            : [
+                'Keep your photo unblurred—no need to blur landmarks or scenery',
+                'Switch caption from live "right now" phrasing to a past-tense recap',
+                'Wait a few hours or days until after departing the area before publishing',
+              ],
       };
     }
 
@@ -230,11 +246,54 @@ export function buildFallbackFixPlan(
           },
         ],
         suggestedRegionsToRedact: redactionBoxes,
-        timingRecommendation: 'Hold until after hotel checkout.',
+        timingRecommendation:
+          'Wait a couple of days until after hotel checkout before posting.',
         plainLanguageChecklist: [
-          'Blur the printed hotel keycard sleeve & Wi-Fi code',
+          ...(redactionBoxes.length > 0
+            ? ['Blur the printed hotel keycard sleeve & Wi-Fi code']
+            : ['Keep travel landmarks unblurred—just delay when you post']),
           'Remove floor number from caption',
-          'Publish after checking out of the property',
+          'Publish only after checking out of the property',
+        ],
+      };
+    }
+
+    if (risk.category === 'recognizable_surroundings') {
+      return {
+        postId: post.id,
+        riskId: risk.id,
+        captionOptions: [
+          {
+            id: 'opt-later-recap',
+            styleLabel: 'Post-Visit Recap (Recommended)',
+            rewrittenCaption:
+              'Still thinking about this view—such an unforgettable afternoon ✨',
+            whatChanged:
+              'Shifted into past-tense recap phrasing so you can post hours or days after leaving without blurring the landmark.',
+          },
+          {
+            id: 'opt-minimal',
+            styleLabel: 'Timeless Editorial',
+            rewrittenCaption: 'Postcards from the camera roll.',
+            whatChanged:
+              'Signals a delayed camera-roll share rather than live real-time presence.',
+          },
+          {
+            id: 'opt-warm',
+            styleLabel: 'Warm Travel Memory',
+            rewrittenCaption:
+              'Favorite memories from a couple days exploring the city 🤍',
+            whatChanged:
+              'Makes clear you have already departed the landmark area.',
+          },
+        ],
+        suggestedRegionsToRedact: redactionBoxes,
+        timingRecommendation:
+          'Do not post in real time—wait a few hours or 1–3 days until after you have left this landmark or neighborhood.',
+        plainLanguageChecklist: [
+          'Keep your photo unblurred—no need to blur a major landmark or skyline',
+          'Wait a few hours or a couple of days after leaving the area before posting',
+          'Use a past-tense or camera-roll recap caption instead of live phrasing',
         ],
       };
     }
@@ -342,7 +401,11 @@ export async function generateSafePostFixPlan(params: {
       `Original Caption / Excerpt:\n${params.post.caption}`,
       `Flagged Risk Category: ${params.risk.category}`,
       `Why It Matters: ${params.risk.whyItMatters}`,
-      `Visual Regions Flagged for Blur: ${redactionBoxes.map((b) => b.label).join(', ') || 'None'}`,
+      `Visual Regions Flagged for Blur: ${
+        redactionBoxes.length > 0
+          ? redactionBoxes.map((b) => b.label).join(', ')
+          : 'None (keep photo unblurred — advise posting hours/days later instead of blurring landmarks)'
+      }`,
     ].join('\n\n');
 
     const parsed = await generateStructuredJson<RawFixPlanResponse>(

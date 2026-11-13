@@ -71,6 +71,8 @@ export interface UnseenConfig {
   readonly redaction: {
     readonly defaultBlurRadiusPx: number;
     readonly boundingBoxPaddingRatio: number;
+    readonly maxAutoBlurAreaRatio: number;
+    readonly nonBlurLandmarkLabelPattern: RegExp;
   };
   readonly exif: {
     readonly maxScanBytes: number;
@@ -164,6 +166,9 @@ export function createAppConfig(): UnseenConfig {
     redaction: Object.freeze({
       defaultBlurRadiusPx: 18,
       boundingBoxPaddingRatio: 0.04,
+      maxAutoBlurAreaRatio: 0.35,
+      nonBlurLandmarkLabelPattern:
+        /\b(eiffel|tower|monument|statue|bridge|skyline|castle|archway|building|facade|exterior|storefront|awning|street\s*view|scenery|landscape|horizon|beach|mountain|park|patio)\b/i,
     }),
     exif: Object.freeze({
       maxScanBytes: 2 * 1024 * 1024,

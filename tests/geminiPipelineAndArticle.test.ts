@@ -219,4 +219,78 @@ describe('Gemini Multimodal Engine — Mocked SDK Execution & Fallback Mode', ()
     expect(fixPlan.suggestedRegionsToRedact).toHaveLength(1);
     expect(fixPlan.suggestedRegionsToRedact[0]?.label).toContain('wristband');
   });
+
+  it('drops nonsensical blur boxes on large landmarks like the Eiffel Tower and advises delayed posting instead', async () => {
+    const attestation = createOwnershipAttestation(true);
+    const eiffelPost = {
+      id: 'post-eiffel',
+      platform: 'camera_roll' as const,
+      title: 'Camera Roll · Paris Sunset',
+      caption: 'At the Eiffel Tower right now watching the lights sparkle!',
+      postedAtLabel: 'Draft · Ready to post',
+      isDraft: true,
+      mediaAltDescription: 'Portrait standing in front of the Eiffel Tower at dusk',
+    };
+
+    const mockLandmarkExecutor: GenAiStructuredExecutor = async (req) => {
+      if (req.stage.startsWith('Stage1_PostMultimodalScan')) {
+        return JSON.stringify({
+          clues: [
+            {
+              category: 'recognizable_surroundings',
+              summary: 'Eiffel Tower landmark in background paired with live "right now" caption.',
+              sourceModality: 'combined',
+              confidencePercentage: 96,
+              boundingBox: {
+                ymin: 50,
+                xmin: 150,
+                ymax: 920,
+                xmax: 850,
+                label: 'Eiffel Tower landmark',
+              },
+            },
+          ],
+        });
+      }
+      return JSON.stringify({
+        risks: [
+          {
+            id: 'risk-eiffel',
+            title: 'Live Eiffel Tower location post while still on site',
+            category: 'recognizable_surroundings',
+            priority: 'high',
+            confidencePercentage: 96,
+            abstractConfidenceStatement:
+              'With 96% confidence, your live Eiffel Tower caption reveals where you are right now.',
+            contributingPostIds: ['post-eiffel'],
+            platformsInvolved: ['camera_roll'],
+            whyItMatters: 'Posting iconic landmarks live reveals your active whereabouts.',
+            combinedEvidenceSummary: 'Eiffel Tower + "right now" caption.',
+            recommendedActionSummary:
+              'Keep the photo unblurred and wait a few hours or days until after leaving the area.',
+            safetyReferenceNote: 'RAINN advises delaying location-identifiable posts.',
+          },
+        ],
+      });
+    };
+
+    const report = await runFullPrivacyAudit({
+      posts: [eiffelPost],
+      attestation,
+      executor: mockLandmarkExecutor,
+    });
+
+    // Landmark bounding box must be stripped automatically
+    expect(report.postFindings[0]?.clues[0]?.boundingBox).toBeUndefined();
+
+    const fixPlan = await generateSafePostFixPlan({
+      post: eiffelPost,
+      risk: report.crossPlatformRisks[0]!,
+      postFinding: report.postFindings[0],
+      attestation,
+    });
+
+    expect(fixPlan.suggestedRegionsToRedact).toHaveLength(0);
+    expect(fixPlan.timingRecommendation.toLowerCase()).toMatch(/hours|days/);
+  });
 });

@@ -62,7 +62,7 @@ Given per-post structured clues from a creator's own photos, binary EXIF metadat
    - In "abstractConfidenceStatement": Start with "With X% confidence, ..." and explicitly cite the EXACT visual landmarks, repeated coffee shop/studio/neighborhood cues, days/times, and which posts showed them (e.g., "With 92% confidence, someone can pinpoint the exact Silver Lake corner café and next-door reformer Pilates studio you visit every Tuesday between 8:00–9:30 AM—matching the marble window table & awning in your IG Story (8:15 AM) with the terracotta studio archway in your YouTube vlog (9:00 AM) and your Substack essay naming Silver Lake.").
    - In "whyItMatters": Explain step-by-step how combining those exact visual + text clues lets a stranger predict where you will be or read sensitive details.
 4. STRICT PRIVACY BOUNDARY: ONLY withhold private residential street numbers/names (e.g., "2840 Hyperion Ave"), private apartment/unit numbers ("Apt 4B"), exact hotel room numbers ("Room 612"), and raw decimal GPS coordinates. DO name public neighborhoods, repeated coffee shops/studios, visual objects, floor numbers, and routine times so the creator sees the exact receipts!
-5. Reference practical creator safety guidance (such as RAINN's recommendation to delay location sharing until after leaving a venue, strip EXIF GPS headers before sharing raw files, and stagger routine posts).`;
+5. PRACTICAL CREATOR REMEDIATION: For big landmarks (like the Eiffel Tower, bridges, skylines), recognizable venues, or routine spots where there is NO small mail/keycard/badge to blur, NEVER tell the creator to blur or crop out the landmark! Instead, in "recommendedActionSummary", advise keeping the photo unblurred and simply NOT posting in real time—waiting a few hours or a couple of days until after leaving the area or trip, paired with a past-tense caption.`;
 
 const RISK_CONNECT_RESPONSE_SCHEMA: Schema = {
   type: Type.OBJECT,
@@ -214,11 +214,12 @@ export function buildFallbackConnectedRisks(
         'Creator safety guidelines advise delaying hotel and lodging posts until after checkout.',
     },
     recognizable_surroundings: {
-      title: 'Repeated exterior storefronts & architectural landmarks across posts',
-      why: 'Distinctive awnings, archways, and street-facing windows across multiple posts narrow down a frequented neighborhood block.',
-      action: 'Crop tighter on the subject or blur exterior signage.',
+      title: 'Recognizable landmarks or surroundings revealing current area',
+      why: 'Iconic landmarks, storefronts, and skyline views immediately identify where a photo was taken—which becomes risky when posted live while you are still in the area.',
+      action:
+        'No need to blur the landmark—keep your photo intact and simply wait a few hours or 1–2 days until after you have left the area before posting.',
       reference:
-        'Cross-post visual landmarks compound quickly when paired with timestamps.',
+        'RAINN digital safety guidance recommends delaying landmark and location-identifiable posts until after departing.',
     },
   };
 
