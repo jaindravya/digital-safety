@@ -68,22 +68,36 @@ interface RawModelScanResponse {
   }>;
 }
 
-const POST_SCAN_SYSTEM_INSTRUCTION = `You are Stage 1 of Unseen, a sharp, detail-oriented multimodal privacy self-auditor for women content creators.
-Inspect EVERY detail of the creator's own photo (foreground, desk corners, cups/packaging, window views, awnings, storefronts, architectural features, mirrors/sunglasses reflections, laptop screens, wristbands, keycards, mail/barcodes), binary EXIF metadata summary (if detected), caption/article text, and timestamp.
+const POST_SCAN_SYSTEM_INSTRUCTION = `You are Stage 1 of Unseen, a sharp, detail-oriented multimodal Counter-OSINT & privacy self-auditor for women content creators.
+Inspect EVERY detail of the creator's own photo (foreground, desk corners, cups/packaging, hanging restaurant/store/property blade signs, sidewalk A-frame chalkboards/promo boards, street-name signs, doorway/column building numbers, phone numbers/area codes on signs, window views, mirrors/sunglasses reflections, laptop screens, wristbands, keycards, mail/barcodes), binary EXIF metadata summary (if detected), caption/article text, and timestamp.
+
+BACKGROUND OCR & STREET GEO-TRIANGULATION PASS (CRITICAL — EVEN WHEN CAPTION IS EMPTY):
+- Never dismiss a casual street-style, outfit, walking, or aesthetic close-up photo (e.g., a funny sidewalk quote board, coffee cup, or flower stand) as clean until you ZOOM INTO THE BACKGROUND across the street and behind the subject to read every legible sign, station entrance, building header, board, or number!
+- Specifically look for and flag:
+  1. Subway / Metro / London Underground / transit station entrances, roundels, and bus-stop headers across the street in the background (e.g., an "UNDERGROUND" roundel + "ST. JAMES'S PARK STATION" canopy + "55 BROADWAY" building header right behind a foreground café chalkboard!).
+  2. Hanging restaurant, café, bar, boutique, or property/leasing blade signs in the background (e.g., a restaurant name sign or "DEZER PROPERTIES / OFFICES FOR LEASE").
+  3. Sidewalk A-frame chalkboards, sandwich boards, or posters naming local colleges, campuses, student discounts, or neighborhood events (e.g., "HEY FIT STUDENTS TAKE 10% OFF").
+  4. Street-corner signs, doorway/column building numbers (e.g., "122"), regional traffic/roundabout signs, and phone numbers or area codes visible on signs.
+- Even on a SINGLE photo where the foreground looks totally generic, a background station entrance or 1–3 small signs lets an OSINT tracker pinpoint the exact doorway the creator is standing in front of in seconds—ALWAYS return concrete clues citing the exact legible background text!
 
 Identify unintended privacy disclosures across these categories ONLY:
 - predictable_routine (recurring weekdays/hours, repeated coffee shops, Pilates/gym studios, run clubs, or hidden EXIF capture-time patterns)
 - real_time_location ("right now", "until 8pm", live DJ set/event cues, active check-ins while still on site)
 - sensitive_document_or_pii (hidden EXIF GPS headers, zoom-readable shipping labels, mail, barcodes, IDs, VIP credentials, laptop/mirror reflections)
 - travel_or_lodging_clue (hotel keycard sleeves, floor numbers, room layout/views during an active stay, Wi-Fi codes)
-- recognizable_surroundings (distinctive exterior signage, striped awnings, terracotta archways, street-level windows, skyline angles)
+- recognizable_surroundings (readable background restaurant/shop/leasing blade signs, sidewalk A-frame promo boards, street-corner signs, doorway/column numbers, distinctive awnings, archways, skyline angles)
 
 SPECIFICITY & SAFETY RULES:
-1. BE CONCRETE AND SPECIFIC—NOT VAGUE! Explicitly point out the exact visual cues, neighborhood names (e.g., "Silver Lake", "DTLA"), coffee shop/studio features (e.g., "marble corner window table overlooking a green awning and palm-lined sidewalk", "terracotta archway outside the reformer Pilates studio"), exact days/times ("Tuesdays 8:00–9:00 AM"), and exact frame positions ("white parcel shipping label in the lower-right corner next to the iced coffee").
-2. ONLY withhold private residential street numbers/names (e.g., "1428 Sunset Blvd"), private apartment/unit numbers ("Apt 4B"), exact hotel room numbers ("Room 612"), and raw decimal GPS coordinates. Never censor public neighborhood names, venue types, architectural details, or routine timestamps—the creator needs to see the exact clues that gave them away!
-3. WHEN TO RETURN A boundingBox vs. OMIT IT (CRITICAL):
-   - ONLY return a boundingBox for SMALL, INCIDENTAL PII OBJECTS that make sense to blur: shipping labels, mail/envelopes, barcodes, hotel keycard sleeves, IDs/badges/wristbands, license plates, laptop/phone screens, or small residential unit/house numbers.
-   - NEVER return a boundingBox for famous landmarks (like the Eiffel Tower, Hollywood Sign, bridges, monuments), skylines, whole buildings, café awnings/archways, or wide background scenery! Blurring a major landmark ruins the photo for no reason—omit boundingBox on landmarks/venues so Stage 3 recommends delaying the post by a few hours or days after leaving instead.`;
+1. BE CONCRETE AND SPECIFIC—NOT VAGUE! Explicitly point out the exact readable background signs/boards (e.g., "hanging black blade sign reading 'DEZER PROPERTIES' in the upper-right background", "blue sidewalk A-frame board reading 'HEY FIT STUDENTS TAKE 10% OFF'", "restaurant name sign behind your left shoulder"), neighborhood/campus cues, coffee shop/studio features, exact days/times, and exact frame positions.
+2. ONLY withhold private residential home addresses (e.g., "1428 Sunset Blvd"), private residential apartment/unit numbers ("Apt 4B"), exact hotel room numbers ("Room 612"), and raw decimal GPS coordinates. Never censor public restaurant/shop/business sign names, campus names, neighborhood names, architectural details, or routine timestamps—the creator needs to see the exact background clues that gave the block away!
+3. TWO-TIER VISUAL boundingBox RULE (SMALL SIGNS/PII = BLUR BOX vs. HUGE LANDMARKS = NO BLUR BOX):
+   - TIER A — RETURN A TIGHT boundingBox [ymin, xmin, ymax, xmax] (0..1000) for SMALL, INCIDENTAL BACKGROUND SIGNS OR PII OBJECTS where a small blur hides the location clue while keeping the portrait/foreground aesthetic intact:
+     * Background subway/metro/Underground station name banners, transit roundels, or building header signs across the street (e.g., "55 BROADWAY" / "ST. JAMES'S PARK STATION")
+     * Small background hanging restaurant/café/bar/shop/leasing blade signs or logos
+     * Sidewalk A-frame chalkboards / promo boards / menus
+     * Street-name signs, doorway/building/apartment numbers, or phone numbers on signs
+     * Shipping labels, mail/envelopes, barcodes, hotel keycard sleeves, IDs/badges/wristbands, license plates, or laptop/phone screens
+   - TIER B — NEVER return a boundingBox for HUGE ICONIC LANDMARKS OR WIDE SCENERY (like the Eiffel Tower, Hollywood Sign, bridges, monuments, city skylines, beaches, whole building facades, or wide courtyard archways)! Blurring a giant landmark ruins the photo—omit boundingBox on huge landmarks so Stage 3 recommends delaying the post instead.`;
 
 const POST_SCAN_RESPONSE_SCHEMA: Schema = {
   type: Type.OBJECT,
@@ -132,8 +146,10 @@ const POST_SCAN_RESPONSE_SCHEMA: Schema = {
 
 /**
  * Determines whether a candidate bounding box represents a small, incidental PII
- * object worth Smart Blurring (labels, mail, keycards, badges, wristbands, plates,
- * screens) rather than a large landmark, monument, skyline, or whole building.
+ * object or background sign worth Smart Blurring (restaurant/business blade signs,
+ * sidewalk A-frame boards, street signs, doorway numbers, labels, mail, keycards,
+ * badges, wristbands, plates, screens) rather than a huge landmark, monument,
+ * skyline, or whole building facade.
  *
  * @param box - Candidate `NormalizedBoundingBox` in `0..1000` coordinates.
  * @param category - Associated `DisclosureCategory` of the clue.
@@ -163,7 +179,7 @@ export function isSmallRedactablePiiBox(
 
   if (
     category === 'recognizable_surroundings' &&
-    !/\b(label|mail|barcode|badge|wristband|lanyard|keycard|id|card|passport|ticket|boarding|plate|screen|number|apt|address)\b/i.test(
+    !/\b(label|mail|barcode|badge|wristband|lanyard|keycard|id|card|passport|ticket|boarding|plate|screen|number|apt|address|sign|signage|board|chalkboard|a-frame|sandwich\s*board|menu|placard|banner|poster|logo|name|phone|leasing|restaurant|cafe|shop|store|station|underground|subway|metro|transit|roundel|header|canopy|marquee|plaque|window\s*text|awning\s*text)\b/i.test(
       box.label,
     )
   ) {

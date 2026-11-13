@@ -168,7 +168,7 @@ export function createAppConfig(): UnseenConfig {
       boundingBoxPaddingRatio: 0.04,
       maxAutoBlurAreaRatio: 0.35,
       nonBlurLandmarkLabelPattern:
-        /\b(eiffel|tower|monument|statue|bridge|skyline|castle|archway|building|facade|exterior|storefront|awning|street\s*view|scenery|landscape|horizon|beach|mountain|park|patio)\b/i,
+        /\b(eiffel|monument|statue|skyline|castle|archway|whole\s+building|building\s+facade|street\s*view|scenery|landscape|horizon|beach|mountain)\b/i,
     }),
     exif: Object.freeze({
       maxScanBytes: 2 * 1024 * 1024,

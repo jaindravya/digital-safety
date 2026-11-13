@@ -58,8 +58,9 @@ Rewrite the creator's caption into 3 natural alternatives that preserve her warm
 - recurring weekly day/hour routines ("every Tuesday at 8am")
 - references to mail, apartment/floor numbers, or active hotel check-ins.
 
-PRACTICAL LANDMARK & TIMING RULE:
-- When Visual Regions Flagged for Blur is "None (keep photo unblurred)"—such as photos featuring famous landmarks (like the Eiffel Tower), skylines, bridges, or recognizable cafés—NEVER tell the creator to blur or crop out the landmark! There is no point blurring a major landmark; instead, set "timingRecommendation" and "plainLanguageChecklist" to clearly advise NOT posting in real time (wait a few hours or a couple of days until after leaving the area or trip before posting).
+PRACTICAL VISUAL BLUR vs. LANDMARK TIMING RULE:
+- When Visual Regions Flagged for Blur lists specific small signs, boards, numbers, or PII (e.g., background restaurant/business blade signs, sidewalk A-frame boards, street signs, doorway numbers, mail, badges): explicitly include checking/applying Smart Blur over those flagged background signs in "plainLanguageChecklist" so the creator keeps her outfit/portrait shot intact while hiding the exact street block!
+- When Visual Regions Flagged for Blur is "None (keep photo unblurred)"—such as photos featuring huge iconic landmarks (like the Eiffel Tower), skylines, or bridges—NEVER tell the creator to blur or crop out the landmark! Instead, set "timingRecommendation" and "plainLanguageChecklist" to clearly advise NOT posting in real time (wait a few hours or a couple of days until after leaving the area or trip before posting).
 - CRITICAL SAFETY RULE: Never include private residential street addresses, apartment/room numbers, or raw GPS coordinates in any option or explanation.`;
 
 const CAPTION_REWRITE_RESPONSE_SCHEMA: Schema = {
@@ -259,6 +260,7 @@ export function buildFallbackFixPlan(
     }
 
     if (risk.category === 'recognizable_surroundings') {
+      const hasSmallSignBlurs = redactionBoxes.length > 0;
       return {
         postId: post.id,
         riskId: risk.id,
@@ -267,9 +269,10 @@ export function buildFallbackFixPlan(
             id: 'opt-later-recap',
             styleLabel: 'Post-Visit Recap (Recommended)',
             rewrittenCaption:
-              'Still thinking about this view—such an unforgettable afternoon ✨',
-            whatChanged:
-              'Shifted into past-tense recap phrasing so you can post hours or days after leaving without blurring the landmark.',
+              'City walks & coffee in hand—such a good afternoon out ✨',
+            whatChanged: hasSmallSignBlurs
+              ? 'Pairs natural past-tense phrasing with Smart Blur over the small background street/business signs.'
+              : 'Shifted into past-tense recap phrasing so you can post hours or days after leaving without blurring the landmark.',
           },
           {
             id: 'opt-minimal',
@@ -280,21 +283,28 @@ export function buildFallbackFixPlan(
           },
           {
             id: 'opt-warm',
-            styleLabel: 'Warm Travel Memory',
+            styleLabel: 'Warm Street Style Note',
             rewrittenCaption:
-              'Favorite memories from a couple days exploring the city 🤍',
+              'Favorite snapshots from a couple days walking around the city 🤍',
             whatChanged:
-              'Makes clear you have already departed the landmark area.',
+              'Makes clear you have already departed the block or landmark area.',
           },
         ],
         suggestedRegionsToRedact: redactionBoxes,
-        timingRecommendation:
-          'Do not post in real time—wait a few hours or 1–3 days until after you have left this landmark or neighborhood.',
-        plainLanguageChecklist: [
-          'Keep your photo unblurred—no need to blur a major landmark or skyline',
-          'Wait a few hours or a couple of days after leaving the area before posting',
-          'Use a past-tense or camera-roll recap caption instead of live phrasing',
-        ],
+        timingRecommendation: hasSmallSignBlurs
+          ? 'Safe to post once the flagged background signs/numbers are blurred—or wait a few hours after leaving the block.'
+          : 'Do not post in real time—wait a few hours or 1–3 days until after you have left this landmark or neighborhood.',
+        plainLanguageChecklist: hasSmallSignBlurs
+          ? [
+              `Apply Smart Blur over the ${redactionBoxes.length} flagged background sign/number region(s) (${redactionBoxes.map((b) => b.label).join(', ')})`,
+              'Wait until after departing the block if sharing a current walk or café stop',
+              'Export clean EXIF-stripped PNG from Fix Studio',
+            ]
+          : [
+              'Keep your photo unblurred—no need to blur a major landmark or skyline',
+              'Wait a few hours or a couple of days after leaving the area before posting',
+              'Use a past-tense or camera-roll recap caption instead of live phrasing',
+            ],
       };
     }
 

@@ -293,4 +293,113 @@ describe('Gemini Multimodal Engine — Mocked SDK Execution & Fallback Mode', ()
     expect(fixPlan.suggestedRegionsToRedact).toHaveLength(0);
     expect(fixPlan.timingRecommendation.toLowerCase()).toMatch(/hours|days/);
   });
+
+  it('preserves tight Smart Blur boxes on small background restaurant/business signs and sidewalk boards in street-style photos', async () => {
+    const attestation = createOwnershipAttestation(true);
+    const streetWalkPost = {
+      id: 'post-street-walk',
+      platform: 'camera_roll' as const,
+      title: 'Camera Roll · City Walk',
+      caption: 'Quick lunch walk',
+      postedAtLabel: 'Draft · Ready to post',
+      isDraft: true,
+      mediaAltDescription: 'Walking down sidewalk holding brown paper lunch bag',
+    };
+
+    const mockStreetSignExecutor: GenAiStructuredExecutor = async (req) => {
+      if (req.stage.startsWith('Stage1_PostMultimodalScan')) {
+        return JSON.stringify({
+          clues: [
+            {
+              category: 'recognizable_surroundings',
+              summary:
+                'Hanging black blade sign reading "DEZER PROPERTIES" in the upper-right background.',
+              sourceModality: 'visual',
+              confidencePercentage: 92,
+              boundingBox: {
+                ymin: 168,
+                xmin: 742,
+                ymax: 212,
+                xmax: 804,
+                label: 'Dezer Properties hanging blade sign',
+              },
+            },
+            {
+              category: 'recognizable_surroundings',
+              summary:
+                'Blue sidewalk A-frame board reading "HEY FIT STUDENTS TAKE 10% OFF EVERY DAY" behind right shoulder.',
+              sourceModality: 'visual',
+              confidencePercentage: 94,
+              boundingBox: {
+                ymin: 325,
+                xmin: 726,
+                ymax: 416,
+                xmax: 814,
+                label: 'Sidewalk A-frame student discount board',
+              },
+            },
+            {
+              category: 'recognizable_surroundings',
+              summary:
+                'Background transit entrance across the street showing "55 BROADWAY", London Underground roundel, and "ST. JAMES\'S PARK STATION".',
+              sourceModality: 'visual',
+              confidencePercentage: 96,
+              boundingBox: {
+                ymin: 112,
+                xmin: 612,
+                ymax: 215,
+                xmax: 798,
+                label: "St. James's Park Underground Station & 55 Broadway header",
+              },
+            },
+          ],
+        });
+      }
+
+      return JSON.stringify({
+        risks: [
+          {
+            id: 'risk-street-signs',
+            title:
+              'Background "Dezer Properties" sign & "FIT Students 10% Off" sidewalk board pinpoint exact Chelsea block',
+            category: 'recognizable_surroundings',
+            priority: 'medium',
+            confidencePercentage: 94,
+            abstractConfidenceStatement:
+              'With 94% confidence, combining the "DEZER PROPERTIES" blade sign and "HEY FIT STUDENTS TAKE 10% OFF" sidewalk board pinpoints the exact block.',
+            contributingPostIds: ['post-street-walk'],
+            platformsInvolved: ['camera_roll'],
+            whyItMatters:
+              'Anyone can Google those two background signs together to locate the exact street block in seconds.',
+            combinedEvidenceSummary:
+              'Hanging "DEZER PROPERTIES" sign + "HEY FIT STUDENTS" sidewalk A-frame board.',
+            recommendedActionSummary:
+              'Blur the small background blade sign and sidewalk A-frame board in Make Post Safer so your outfit shot stays intact.',
+            safetyReferenceNote: 'Counter-OSINT street-level geo-triangulation.',
+          },
+        ],
+      });
+    };
+
+    const report = await runFullPrivacyAudit({
+      posts: [streetWalkPost],
+      attestation,
+      executor: mockStreetSignExecutor,
+    });
+
+    expect(report.postFindings[0]?.clues).toHaveLength(3);
+    expect(report.postFindings[0]?.clues[0]?.boundingBox?.label).toContain('sign');
+    expect(report.postFindings[0]?.clues[1]?.boundingBox?.label).toContain('A-frame');
+    expect(report.postFindings[0]?.clues[2]?.boundingBox?.label).toContain('Station');
+
+    const fixPlan = await generateSafePostFixPlan({
+      post: streetWalkPost,
+      risk: report.crossPlatformRisks[0]!,
+      postFinding: report.postFindings[0],
+      attestation,
+    });
+
+    expect(fixPlan.suggestedRegionsToRedact).toHaveLength(3);
+    expect(fixPlan.plainLanguageChecklist.join(' ')).toMatch(/Blur/i);
+  });
 });
