@@ -12,7 +12,7 @@
  * 2. Communicating anti-surveillance, on-session-only privacy commitments clearly.
  */
 
-import { ShieldCheck } from 'lucide-react';
+import { Check, ShieldCheck } from 'lucide-react';
 import React from 'react';
 import {
   DEFAULT_ATTESTATION_STATEMENT,
@@ -54,78 +54,138 @@ export function ConsentBannerCard(
 
   return (
     <section
-      className="unseen-card"
+      className="unseen-cream-card"
       aria-label="Privacy-First Self-Audit Terms and Ownership Attestation"
       style={{
-        background: attestation.attestedByCreator ? '#f4faf6' : '#ffffff',
-        borderColor: attestation.attestedByCreator ? '#b9dec9' : undefined,
+        background: 'var(--card-sand)',
+        borderColor: attestation.attestedByCreator
+          ? '#a7f3d0'
+          : 'var(--card-border)',
       }}
     >
-      <div style={{ display: 'flex', gap: '14px', alignItems: 'flex-start' }}>
+      <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
         <div
           style={{
-            width: '38px',
-            height: '38px',
-            borderRadius: '12px',
-            background: '#e7f5ee',
-            color: '#186844',
+            width: '36px',
+            height: '36px',
+            borderRadius: '999px',
+            background: 'var(--card-well)',
+            border: '1px solid var(--card-well-border)',
+            color: 'var(--card-ink)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             flexShrink: 0,
+            marginTop: '2px',
           }}
         >
-          <ShieldCheck size={20} aria-hidden="true" />
+          <ShieldCheck size={17} aria-hidden="true" />
         </div>
-        <div style={{ flex: 1 }}>
+
+        <div style={{ flex: 1, minWidth: 0 }}>
           <div
             style={{
               display: 'flex',
               alignItems: 'center',
+              justifyContent: 'space-between',
               gap: '8px',
               flexWrap: 'wrap',
-              marginBottom: '4px',
+              marginBottom: '6px',
             }}
           >
-            <strong style={{ fontSize: '0.96rem' }}>
-              Privacy-First · No Account · Zero Persistent Storage
+            <strong
+              style={{
+                fontSize: '0.84rem',
+                fontWeight: 800,
+                letterSpacing: '0.03em',
+                textTransform: 'uppercase',
+                color: 'var(--card-ink)',
+              }}
+            >
+              100% Private · Zero Persistent Storage
             </strong>
-            <span className="unseen-pill low">Self-Audit Only</span>
+            <span
+              className={`unseen-pill ${
+                attestation.attestedByCreator ? 'low' : 'platform'
+              }`}
+            >
+              <span className="unseen-pill-dot" />
+              {attestation.attestedByCreator ? 'Consent Verified' : 'Self-Audit Gate'}
+            </span>
           </div>
+
           <p
             style={{
               margin: '0 0 12px',
-              fontSize: '0.86rem',
-              color: 'var(--ink-secondary)',
-              lineHeight: 1.45,
+              fontSize: '0.8rem',
+              color: 'var(--card-ink-muted)',
+              lineHeight: 1.5,
             }}
           >
             Your original camera-roll photos and article links stay strictly in
             this ephemeral session and are never saved to a database or used to
             infer exact home addresses.
           </p>
+
           <label
             style={{
               display: 'flex',
               alignItems: 'flex-start',
               gap: '10px',
               cursor: 'pointer',
-              fontSize: '0.88rem',
-              fontWeight: 600,
+              padding: '10px 12px',
+              borderRadius: '12px',
+              background: '#ffffff',
+              border: '1px solid var(--card-well-border)',
             }}
           >
-            <input
-              type="checkbox"
-              checked={attestation.attestedByCreator}
-              onChange={handleCheckboxChange}
+            <span
               style={{
-                width: '18px',
-                height: '18px',
-                marginTop: '2px',
-                accentColor: 'var(--accent-forest)',
+                position: 'relative',
+                width: '22px',
+                height: '22px',
+                borderRadius: '6px',
+                background: attestation.attestedByCreator
+                  ? 'var(--card-ink)'
+                  : '#ffffff',
+                border: attestation.attestedByCreator
+                  ? '1px solid var(--card-ink)'
+                  : '1px solid var(--card-well-border)',
+                color: '#faf7f5',
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexShrink: 0,
+                marginTop: '1px',
+                transition: 'background-color 0.15s ease',
               }}
-            />
-            <span>{DEFAULT_ATTESTATION_STATEMENT}</span>
+            >
+              <input
+                type="checkbox"
+                checked={attestation.attestedByCreator}
+                onChange={handleCheckboxChange}
+                style={{
+                  position: 'absolute',
+                  inset: 0,
+                  opacity: 0,
+                  margin: 0,
+                  cursor: 'pointer',
+                }}
+              />
+              {attestation.attestedByCreator && (
+                <Check size={14} strokeWidth={2.75} aria-hidden="true" />
+              )}
+            </span>
+            <span
+              style={{
+                fontSize: '0.8rem',
+                fontWeight: 600,
+                color: 'var(--card-ink)',
+                lineHeight: 1.45,
+              }}
+            >
+              {DEFAULT_ATTESTATION_STATEMENT}
+            </span>
           </label>
         </div>
       </div>

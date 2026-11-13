@@ -3,20 +3,20 @@
  * @description Step 3 Interactive Pre-Post Fixer & Before/After Preview Studio.
  *
  * Feature Overview:
- * Delivers Unseen's hero transformation moment:
+ * Delivers Unseen's pre-publication safety transformation inside a warm-cream
+ * editorial studio modal:
  *   1. Highlights Gemini's Stage 1 `[ymin, xmin, ymax, xmax]` bounding boxes over
- *      sensitive labels, room cards, or wristbands and applies real client-side
- *      HTML5 Canvas Smart Blur (`applyRedactionBoxesToImage`).
- *   2. Supports human-in-the-loop oversight by letting the creator click-and-drag
- *      or tap **"Add Custom Blur Region"** anywhere on the photo!
- *   3. Displays Gemini Stage 3's **3 voice-preserving caption rewrites** alongside
- *      publish-timing guidance and a crisp **Before vs. After** comparison toggle.
- *   4. Lets creators **Apply Safe Changes** (resolving the risk & lowering the
- *      `0–100` Exposure Score live!) and **Download Protected Photo** to their
- *      Android phone or Mac.
+ *      sensitive labels, room cards, or wristbands and applies client-side HTML5
+ *      Canvas Smart Blur (`applyRedactionBoxesToImage`).
+ *   2. Supports human-in-the-loop oversight by letting the creator drag a custom
+ *      redaction box directly on the photo.
+ *   3. Displays Gemini Stage 3's 3 voice-preserving caption rewrites alongside
+ *      publish-timing guidance and a monochrome `Before / After` vs `Safe Only` toggle.
+ *   4. Lets creators apply safe changes (updating the report score live) and
+ *      download the clean redacted PNG locally.
  *
  * Primary Use Cases:
- * 1. Scene 4 & Scene 5 of the live demo ("Make this post safer" -> Before/After reveal).
+ * 1. Resolving visual PII, routine, and real-time location risks before publishing.
  * 2. Exporting a clean, blurred photo + rewritten caption ready to post safely.
  */
 
@@ -26,6 +26,7 @@ import {
   Download,
   Eye,
   PlusSquare,
+  ShieldCheck,
   Sparkles,
   X,
 } from 'lucide-react';
@@ -85,7 +86,6 @@ export function SafeFixStudioModal(
 
   const imageContainerRef = useRef<HTMLDivElement | null>(null);
 
-  // Sync Stage 3 suggestions once loaded
   useEffect(() => {
     if (!props.fixPlan || props.existingFix) {
       return;
@@ -97,7 +97,6 @@ export function SafeFixStudioModal(
     }
   }, [props.fixPlan, props.existingFix]);
 
-  // Re-render blurred canvas whenever activeBoxes or enableBlur changes
   useEffect(() => {
     if (!originalImageSrc) {
       setRedactedDataUrl(undefined);
@@ -240,8 +239,9 @@ export function SafeFixStudioModal(
       role="dialog"
       aria-modal="true"
       aria-label="Make This Post Safer Pre-Post Fix Studio"
+      onClick={props.onClose}
     >
-      <div className="unseen-modal-sheet">
+      <div className="unseen-modal-sheet" onClick={(e) => e.stopPropagation()}>
         <div
           style={{
             display: 'flex',
@@ -252,212 +252,236 @@ export function SafeFixStudioModal(
         >
           <div>
             <span className={`unseen-pill ${props.risk.priority}`}>
+              <span className="unseen-pill-dot" />
               Fixing: {props.risk.title}
             </span>
-            <h2 className="unseen-serif-h2" style={{ marginTop: '6px' }}>
+            <h2
+              className="unseen-card-title"
+              style={{ fontSize: '1.28rem', marginTop: '8px' }}
+            >
               Make This Post Safer Before Publishing
             </h2>
           </div>
           <button
             type="button"
-            className="unseen-btn unseen-btn-secondary unseen-btn-sm"
+            className="unseen-btn unseen-btn-sand unseen-btn-sm"
             onClick={props.onClose}
             aria-label="Close Fix Studio"
           >
-            <X size={16} />
+            <X size={15} />
             Close
           </button>
         </div>
 
         {props.isLoadingPlan ? (
           <div style={{ padding: '48px 16px', textAlign: 'center' }}>
-            <Sparkles size={28} color="var(--accent-coral)" />
-            <p style={{ fontWeight: 600, marginTop: '10px' }}>
-              Gemini is crafting voice-preserving rewrites & redaction boxes…
+            <Sparkles size={28} color="var(--card-plum)" />
+            <p style={{ fontWeight: 700, marginTop: '10px', color: 'var(--card-ink)' }}>
+              Gemini is crafting voice-preserving rewrites &amp; redaction
+              boxes…
             </p>
           </div>
         ) : (
-          <>
-            <div className="unseen-studio-split">
-              {/* Left Column: Visual Smart Blur & Before/After Image Preview */}
-              <div>
-                {originalImageSrc ? (
-                  <div className="unseen-card" style={{ padding: '14px', marginBottom: 0 }}>
-                    <div
-                      style={{
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                        alignItems: 'center',
-                        marginBottom: '10px',
-                        flexWrap: 'wrap',
-                        gap: '6px',
-                      }}
-                    >
-                      <strong style={{ fontSize: '0.88rem' }}>
-                        Visual Privacy Preview
-                      </strong>
-                      <div style={{ display: 'flex', gap: '6px' }}>
-                        <button
-                          type="button"
-                          className={`unseen-btn unseen-btn-sm ${
-                            viewMode === 'compare'
-                              ? 'unseen-btn-primary'
-                              : 'unseen-btn-secondary'
-                          }`}
-                          onClick={() => setViewMode('compare')}
-                        >
-                          <Eye size={13} />
-                          Before / After
-                        </button>
-                        <button
-                          type="button"
-                          className={`unseen-btn unseen-btn-sm ${
-                            viewMode === 'after'
-                              ? 'unseen-btn-primary'
-                              : 'unseen-btn-secondary'
-                          }`}
-                          onClick={() => setViewMode('after')}
-                        >
-                          Safe Only
-                        </button>
-                      </div>
-                    </div>
+          <div className="unseen-studio-split">
+            {/* Left Column: Visual Smart Blur & Before/After Image Preview */}
+            <div>
+              {originalImageSrc ? (
+                <div
+                  className="unseen-white-tile"
+                  style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}
+                >
+                  <div
+                    style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      flexWrap: 'wrap',
+                      gap: '8px',
+                    }}
+                  >
+                    <strong style={{ fontSize: '0.84rem', color: 'var(--card-ink)' }}>
+                      Visual Privacy Preview
+                    </strong>
 
-                    {viewMode === 'compare' ? (
-                      <div
-                        style={{
-                          display: 'grid',
-                          gridTemplateColumns: '1fr 1fr',
-                          gap: '10px',
-                        }}
-                      >
-                        <div>
-                          <div
-                            style={{
-                              fontSize: '0.74rem',
-                              fontWeight: 700,
-                              color: 'var(--status-high-ink)',
-                              marginBottom: '4px',
-                            }}
-                          >
-                            BEFORE (Exposed)
-                          </div>
-                          <div style={{ position: 'relative' }}>
-                            <img
-                              src={originalImageSrc}
-                              alt="Original unredacted post"
-                              style={{
-                                width: '100%',
-                                borderRadius: '10px',
-                                display: 'block',
-                              }}
-                            />
-                            {activeBoxes.map((box, idx) => (
-                              <div
-                                key={`${box.label}-${idx}`}
-                                title={box.label}
-                                style={{
-                                  position: 'absolute',
-                                  top: `${box.ymin / 10}%`,
-                                  left: `${box.xmin / 10}%`,
-                                  width: `${(box.xmax - box.xmin) / 10}%`,
-                                  height: `${(box.ymax - box.ymin) / 10}%`,
-                                  border: '2px dashed #d85745',
-                                  borderRadius: '6px',
-                                  background: 'rgba(216, 87, 69, 0.14)',
-                                  pointerEvents: 'none',
-                                }}
-                              />
-                            ))}
-                          </div>
-                        </div>
-
-                        <div>
-                          <div
-                            style={{
-                              fontSize: '0.74rem',
-                              fontWeight: 700,
-                              color: 'var(--status-low-ink)',
-                              marginBottom: '4px',
-                            }}
-                          >
-                            AFTER (Smart Blurred)
-                          </div>
-                          <div
-                            ref={imageContainerRef}
-                            onPointerDown={handlePointerDown}
-                            onPointerUp={handlePointerUp}
-                            style={{
-                              position: 'relative',
-                              cursor: drawingMode ? 'crosshair' : 'default',
-                              touchAction: drawingMode ? 'none' : 'auto',
-                            }}
-                          >
-                            <img
-                              src={redactedDataUrl ?? originalImageSrc}
-                              alt="Protected post with sensitive areas blurred"
-                              style={{
-                                width: '100%',
-                                borderRadius: '10px',
-                                display: 'block',
-                              }}
-                            />
-                          </div>
-                        </div>
-                      </div>
-                    ) : (
-                      <div
-                        ref={imageContainerRef}
-                        onPointerDown={handlePointerDown}
-                        onPointerUp={handlePointerUp}
-                        style={{
-                          position: 'relative',
-                          cursor: drawingMode ? 'crosshair' : 'default',
-                          touchAction: drawingMode ? 'none' : 'auto',
-                        }}
-                      >
-                        <img
-                          src={redactedDataUrl ?? originalImageSrc}
-                          alt="Protected post preview"
-                          style={{ width: '100%', borderRadius: '12px', display: 'block' }}
-                        />
-                      </div>
-                    )}
-
-                    <div
-                      style={{
-                        display: 'flex',
-                        flexWrap: 'wrap',
-                        gap: '8px',
-                        marginTop: '12px',
-                        alignItems: 'center',
-                      }}
-                    >
-                      <label
-                        style={{
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '6px',
-                          fontSize: '0.82rem',
-                          fontWeight: 600,
-                          cursor: 'pointer',
-                        }}
-                      >
-                        <input
-                          type="checkbox"
-                          checked={enableBlur}
-                          onChange={(e) => setEnableBlur(e.target.checked)}
-                        />
-                        Smart Blur ({activeBoxes.length} region
-                        {activeBoxes.length === 1 ? '' : 's'})
-                      </label>
-
+                    <div className="unseen-mono-track">
                       <button
                         type="button"
-                        className="unseen-btn unseen-btn-secondary unseen-btn-sm"
+                        onClick={() => setViewMode('compare')}
+                        className={`unseen-mono-option ${
+                          viewMode === 'compare' ? 'active' : ''
+                        }`}
+                        style={{ minHeight: '30px', padding: '4px 12px', fontSize: '0.72rem' }}
+                      >
+                        <Eye size={12} />
+                        <span>Before / After</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setViewMode('after')}
+                        className={`unseen-mono-option ${
+                          viewMode === 'after' ? 'active' : ''
+                        }`}
+                        style={{ minHeight: '30px', padding: '4px 12px', fontSize: '0.72rem' }}
+                      >
+                        <span>Safe Only</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {viewMode === 'compare' ? (
+                    <div
+                      style={{
+                        display: 'grid',
+                        gridTemplateColumns: '1fr 1fr',
+                        gap: '10px',
+                      }}
+                    >
+                      <div>
+                        <div
+                          style={{
+                            fontSize: '0.7rem',
+                            fontWeight: 800,
+                            letterSpacing: '0.05em',
+                            color: 'var(--status-high-ink)',
+                            marginBottom: '5px',
+                          }}
+                        >
+                          BEFORE (EXPOSED)
+                        </div>
+                        <div
+                          style={{
+                            position: 'relative',
+                            borderRadius: '10px',
+                            overflow: 'hidden',
+                            background: 'var(--surface-dim)',
+                          }}
+                        >
+                          <img
+                            src={originalImageSrc}
+                            alt="Original unredacted post"
+                            style={{
+                              width: '100%',
+                              display: 'block',
+                            }}
+                          />
+                          {activeBoxes.map((box, idx) => (
+                            <div
+                              key={`${box.label}-${idx}`}
+                              title={box.label}
+                              style={{
+                                position: 'absolute',
+                                top: `${box.ymin / 10}%`,
+                                left: `${box.xmin / 10}%`,
+                                width: `${(box.xmax - box.xmin) / 10}%`,
+                                height: `${(box.ymax - box.ymin) / 10}%`,
+                                border: '2px dashed #ff5449',
+                                borderRadius: '6px',
+                                background: 'rgba(255, 84, 73, 0.16)',
+                                pointerEvents: 'none',
+                              }}
+                            />
+                          ))}
+                        </div>
+                      </div>
+
+                      <div>
+                        <div
+                          style={{
+                            fontSize: '0.7rem',
+                            fontWeight: 800,
+                            letterSpacing: '0.05em',
+                            color: 'var(--status-low-ink)',
+                            marginBottom: '5px',
+                          }}
+                        >
+                          AFTER (SMART BLURRED)
+                        </div>
+                        <div
+                          ref={imageContainerRef}
+                          onPointerDown={handlePointerDown}
+                          onPointerUp={handlePointerUp}
+                          style={{
+                            position: 'relative',
+                            borderRadius: '10px',
+                            overflow: 'hidden',
+                            background: 'var(--surface-dim)',
+                            cursor: drawingMode ? 'crosshair' : 'default',
+                            touchAction: drawingMode ? 'none' : 'auto',
+                          }}
+                        >
+                          <img
+                            src={redactedDataUrl ?? originalImageSrc}
+                            alt="Protected post with sensitive areas blurred"
+                            style={{
+                              width: '100%',
+                              display: 'block',
+                            }}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div
+                      ref={imageContainerRef}
+                      onPointerDown={handlePointerDown}
+                      onPointerUp={handlePointerUp}
+                      style={{
+                        position: 'relative',
+                        borderRadius: '12px',
+                        overflow: 'hidden',
+                        background: 'var(--surface-dim)',
+                        cursor: drawingMode ? 'crosshair' : 'default',
+                        touchAction: drawingMode ? 'none' : 'auto',
+                      }}
+                    >
+                      <img
+                        src={redactedDataUrl ?? originalImageSrc}
+                        alt="Protected post preview"
+                        style={{ width: '100%', display: 'block' }}
+                      />
+                    </div>
+                  )}
+
+                  <div
+                    className="unseen-well"
+                    style={{
+                      display: 'flex',
+                      flexWrap: 'wrap',
+                      gap: '8px',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                    }}
+                  >
+                    <label
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '7px',
+                        fontSize: '0.78rem',
+                        fontWeight: 700,
+                        color: 'var(--card-ink)',
+                        cursor: 'pointer',
+                      }}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={enableBlur}
+                        onChange={(e) => setEnableBlur(e.target.checked)}
+                        style={{ accentColor: 'var(--card-ink)' }}
+                      />
+                      Smart Blur ({activeBoxes.length} region
+                      {activeBoxes.length === 1 ? '' : 's'})
+                    </label>
+
+                    <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                      <button
+                        type="button"
+                        className={`unseen-btn unseen-btn-sm ${
+                          drawingMode ? 'unseen-btn-dark' : 'unseen-btn-cream'
+                        }`}
                         onClick={() => setDrawingMode((v) => !v)}
                       >
-                        <PlusSquare size={14} />
+                        <PlusSquare size={13} />
                         {drawingMode
                           ? 'Drag across photo now…'
                           : 'Draw Custom Blur Box'}
@@ -465,55 +489,101 @@ export function SafeFixStudioModal(
 
                       <button
                         type="button"
-                        className="unseen-btn unseen-btn-secondary unseen-btn-sm"
+                        className="unseen-btn unseen-btn-cream unseen-btn-sm"
                         onClick={handleDownloadProtectedPhoto}
                       >
-                        <Download size={14} />
+                        <Download size={13} />
                         Download Safe Photo
                       </button>
                     </div>
                   </div>
-                ) : (
-                  <div className="unseen-card" style={{ marginBottom: 0 }}>
-                    <strong>Written Article / Newsletter Excerpt</strong>
-                    <p
-                      style={{
-                        fontSize: '0.85rem',
-                        color: 'var(--ink-secondary)',
-                        background: 'var(--bg-subtle)',
-                        padding: '12px',
-                        borderRadius: '10px',
-                      }}
-                    >
-                      “{props.post.caption}”
-                    </p>
-                  </div>
-                )}
-              </div>
 
-              {/* Right Column: Voice-Preserving Caption Rewrites + Timing */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                <div className="unseen-card" style={{ padding: '16px', marginBottom: 0 }}>
-                  <strong style={{ fontSize: '0.9rem', display: 'block', marginBottom: '6px' }}>
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      fontSize: '0.75rem',
+                      color: 'var(--card-ink-muted)',
+                    }}
+                  >
+                    <ShieldCheck size={15} color="#059669" aria-hidden="true" />
+                    <span>
+                      Processed ephemerally in local canvas RAM—nothing saved
+                      to disk or cloud.
+                    </span>
+                  </div>
+                </div>
+              ) : (
+                <div className="unseen-white-tile" style={{ padding: '16px' }}>
+                  <strong style={{ fontSize: '0.86rem', color: 'var(--card-ink)' }}>
+                    Written Article / Newsletter Excerpt
+                  </strong>
+                  <p
+                    className="unseen-well"
+                    style={{
+                      fontSize: '0.82rem',
+                      color: 'var(--card-ink-secondary)',
+                      marginTop: '10px',
+                      marginBottom: 0,
+                      lineHeight: 1.55,
+                    }}
+                  >
+                    “{props.post.caption}”
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {/* Right Column: Voice-Preserving Caption Rewrites + Timing */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              <div
+                className="unseen-white-tile"
+                style={{
+                  padding: '16px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '12px',
+                }}
+              >
+                <div>
+                  <strong
+                    style={{
+                      fontSize: '0.82rem',
+                      display: 'block',
+                      marginBottom: '6px',
+                      color: 'var(--card-ink)',
+                    }}
+                  >
                     Original Caption / Excerpt (Before)
                   </strong>
                   <div
                     style={{
-                      fontSize: '0.84rem',
+                      fontSize: '0.8rem',
                       color: 'var(--status-high-ink)',
                       background: 'var(--status-high-bg)',
+                      border: '1px solid var(--status-high-border)',
                       padding: '10px 12px',
                       borderRadius: '10px',
-                      marginBottom: '14px',
+                      lineHeight: 1.45,
                     }}
                   >
                     “{props.post.caption || '(No caption entered)'}”
                   </div>
+                </div>
 
-                  <strong style={{ fontSize: '0.9rem', display: 'block', marginBottom: '8px' }}>
+                <div>
+                  <strong
+                    style={{
+                      fontSize: '0.82rem',
+                      display: 'block',
+                      marginBottom: '8px',
+                      color: 'var(--card-ink)',
+                    }}
+                  >
                     Choose a Voice-Preserving Rewrite (Gemini)
                   </strong>
-                  <div style={{ display: 'grid', gap: '8px', marginBottom: '12px' }}>
+                  <div style={{ display: 'grid', gap: '8px' }}>
                     {(props.fixPlan?.captionOptions ?? []).map((opt) => {
                       const active = selectedCaption === opt.rewrittenCaption;
                       return (
@@ -526,32 +596,73 @@ export function SafeFixStudioModal(
                             padding: '10px 12px',
                             borderRadius: '12px',
                             border: active
-                              ? '2px solid var(--accent-forest)'
-                              : '1px solid var(--border-sand)',
-                            background: active ? '#f2faf6' : '#ffffff',
+                              ? '2px solid var(--card-ink)'
+                              : '1px solid var(--card-well-border)',
+                            background: active ? 'var(--card-cream)' : '#ffffff',
                             cursor: 'pointer',
                           }}
                         >
-                          <div style={{ fontSize: '0.76rem', fontWeight: 700, color: 'var(--accent-forest)' }}>
-                            {opt.styleLabel}
+                          <div
+                            style={{
+                              display: 'flex',
+                              justifyContent: 'space-between',
+                              alignItems: 'center',
+                              gap: '6px',
+                            }}
+                          >
+                            <span
+                              style={{
+                                fontSize: '0.72rem',
+                                fontWeight: 800,
+                                color: 'var(--card-plum)',
+                                textTransform: 'uppercase',
+                                letterSpacing: '0.04em',
+                              }}
+                            >
+                              {opt.styleLabel}
+                            </span>
+                            {active && (
+                              <span
+                                className="unseen-pill low"
+                                style={{ padding: '2px 7px', fontSize: '0.66rem' }}
+                              >
+                                Selected
+                              </span>
+                            )}
                           </div>
-                          <div style={{ fontSize: '0.88rem', fontWeight: 600, margin: '3px 0' }}>
+                          <div
+                            style={{
+                              fontSize: '0.84rem',
+                              fontWeight: 700,
+                              color: 'var(--card-ink)',
+                              margin: '4px 0',
+                              lineHeight: 1.4,
+                            }}
+                          >
                             “{opt.rewrittenCaption}”
                           </div>
-                          <div style={{ fontSize: '0.75rem', color: 'var(--ink-secondary)' }}>
+                          <div
+                            style={{
+                              fontSize: '0.74rem',
+                              color: 'var(--card-ink-muted)',
+                            }}
+                          >
                             {opt.whatChanged}
                           </div>
                         </button>
                       );
                     })}
                   </div>
+                </div>
 
+                <div>
                   <label
                     style={{
                       display: 'block',
-                      fontSize: '0.8rem',
-                      fontWeight: 700,
-                      marginBottom: '4px',
+                      fontSize: '0.76rem',
+                      fontWeight: 800,
+                      marginBottom: '5px',
+                      color: 'var(--card-ink)',
                     }}
                   >
                     Final Safer Caption (Editable — You Stay in Control)
@@ -563,43 +674,58 @@ export function SafeFixStudioModal(
                     onChange={(e) => setSelectedCaption(e.target.value)}
                   />
                 </div>
+              </div>
 
-                {props.fixPlan && (
-                  <div
-                    className="unseen-card"
-                    style={{
-                      padding: '14px 16px',
-                      marginBottom: 0,
-                      background: 'var(--bg-subtle)',
-                    }}
-                  >
-                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center', fontWeight: 700, fontSize: '0.86rem' }}>
-                      <Clock size={16} color="var(--accent-forest)" />
-                      Recommended Timing: {props.fixPlan.timingRecommendation}
-                    </div>
-                  </div>
-                )}
-
-                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '4px' }}>
-                  <button
-                    type="button"
-                    className="unseen-btn unseen-btn-secondary"
-                    onClick={props.onClose}
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="button"
-                    className="unseen-btn unseen-btn-primary"
-                    onClick={handleCommitFix}
-                  >
-                    <Check size={17} />
-                    Apply Safe Fix to Post
-                  </button>
+              {props.fixPlan && (
+                <div
+                  className="unseen-well"
+                  style={{
+                    display: 'flex',
+                    gap: '8px',
+                    alignItems: 'flex-start',
+                    fontWeight: 700,
+                    fontSize: '0.8rem',
+                    color: 'var(--card-ink)',
+                  }}
+                >
+                  <Clock
+                    size={16}
+                    color="var(--card-plum)"
+                    style={{ flexShrink: 0, marginTop: '2px' }}
+                    aria-hidden="true"
+                  />
+                  <span>
+                    Recommended Timing: {props.fixPlan.timingRecommendation}
+                  </span>
                 </div>
+              )}
+
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'flex-end',
+                  gap: '10px',
+                  marginTop: '2px',
+                }}
+              >
+                <button
+                  type="button"
+                  className="unseen-btn unseen-btn-sand"
+                  onClick={props.onClose}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  className="unseen-btn unseen-btn-dark"
+                  onClick={handleCommitFix}
+                >
+                  <Check size={16} />
+                  Apply Safe Fix to Post
+                </button>
               </div>
             </div>
-          </>
+          </div>
         )}
       </div>
     </div>

@@ -1,19 +1,27 @@
 /**
  * @file src/ui/components/BestPracticesView.tsx
- * @description Step 4 Personalized & General Digital Safety Checklist view with
- * ephemeral session checkboxes and one-tap local file download.
+ * @description Step 4 Personalized & General Digital Safety Playbook view with
+ * ephemeral session checkboxes and one-tap local checklist download.
  *
  * Feature Overview:
- * Surfaces scan-triggered personalized safety recommendations alongside foundational
- * creator safety habits so users can take actionable guidance offline after their
- * zero-storage session ends.
+ * Matches Unseen's dark-plum + warm-cream Playbook aesthetic, surfacing
+ * scan-triggered personalized interventions alongside foundational creator
+ * safety habits with live progress counters and zero-persistence local export.
  *
  * Primary Use Cases:
  * 1. Checking off safety steps before publishing across social platforms.
- * 2. Downloading `unseen-safety-checklist.md` locally on Android or Mac.
+ * 2. Downloading `unseen-safety-checklist.md` locally on iOS, Android, or Mac.
  */
 
-import { CheckSquare, Download } from 'lucide-react';
+import {
+  AlertCircle,
+  Check,
+  Download,
+  FileDown,
+  Fingerprint,
+  Flame,
+  Shield,
+} from 'lucide-react';
 import React from 'react';
 import { BestPracticeRecommendation } from '../../domain/privacyTypes';
 import {
@@ -30,12 +38,13 @@ export interface BestPracticesViewProps {
   readonly checkedIds: ReadonlySet<string>;
   readonly currentExposureScore?: number;
   readonly onToggleChecked: (id: string) => void;
+  readonly onResetChecked?: () => void;
 }
 
 /**
  * Renders interactive personalized and general safety checklist cards plus download button.
  *
- * @param props - Best-practice items, checked IDs set, and toggle callback.
+ * @param props - Best-practice items, checked IDs set, and toggle/reset callbacks.
  * @returns Accessible checklist view element.
  */
 export function BestPracticesView(
@@ -43,6 +52,9 @@ export function BestPracticesView(
 ): React.ReactElement {
   const personalized = props.items.filter((i) => i.kind === 'personalized');
   const general = props.items.filter((i) => i.kind === 'general');
+  const totalCompleted = props.items.filter((i) =>
+    props.checkedIds.has(i.id),
+  ).length;
 
   /**
    * Formats and downloads the user's current checklist locally.
@@ -61,146 +73,442 @@ export function BestPracticesView(
   }
 
   return (
-    <div>
-      <div
-        style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'flex-start',
-          flexWrap: 'wrap',
-          gap: '12px',
-          marginBottom: '18px',
-        }}
-      >
-        <div>
-          <h1 className="unseen-serif-h1" style={{ fontSize: '1.8rem' }}>
-            Personalized Creator Safety Checklist
-          </h1>
-          <p style={{ margin: 0, color: 'var(--ink-secondary)', fontSize: '0.92rem' }}>
-            Tick items off during your session and download a copy—nothing is
-            retained after you close Unseen.
-          </p>
-        </div>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+      {/* Editorial Hero Framing */}
+      <section className="unseen-hero" style={{ marginBottom: 0 }}>
+        <p className="unseen-hero-eyebrow">
+          Session Confidential · In-Memory Only
+        </p>
+        <h1 className="unseen-hero-title">Personalized Safety Playbook</h1>
+        <p className="unseen-hero-sub">
+          Actionable digital defense habits tailored to your latest scan. Stored
+          strictly in your active browser session—download a copy before closing.
+        </p>
+      </section>
 
-        <button
-          type="button"
-          className="unseen-btn unseen-btn-primary"
-          onClick={handleDownload}
-        >
-          <Download size={16} />
-          Download Best Practices
-        </button>
-      </div>
-
-      {personalized.length > 0 && (
-        <section className="unseen-card" aria-label="Personalized Recommendations">
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
-            <CheckSquare size={19} color="var(--accent-coral)" />
-            <h2 className="unseen-serif-h2" style={{ margin: 0 }}>
-              Triggered by Your Audit ({personalized.length})
-            </h2>
-          </div>
-
-          <div style={{ display: 'grid', gap: '10px' }}>
-            {personalized.map((item) => {
-              const checked = props.checkedIds.has(item.id);
-              return (
-                <label
-                  key={item.id}
-                  style={{
-                    display: 'flex',
-                    gap: '12px',
-                    alignItems: 'flex-start',
-                    padding: '12px 14px',
-                    borderRadius: '14px',
-                    border: '1px solid var(--border-sand)',
-                    background: checked ? '#f2faf6' : '#ffffff',
-                    cursor: 'pointer',
-                  }}
-                >
-                  <input
-                    type="checkbox"
-                    checked={checked}
-                    onChange={() => props.onToggleChecked(item.id)}
-                    style={{
-                      width: '18px',
-                      height: '18px',
-                      marginTop: '3px',
-                      accentColor: 'var(--accent-forest)',
-                    }}
-                  />
-                  <div>
-                    <div
-                      style={{
-                        fontWeight: 700,
-                        fontSize: '0.92rem',
-                        textDecoration: checked ? 'line-through' : 'none',
-                      }}
-                    >
-                      {item.title}
-                    </div>
-                    <div style={{ fontSize: '0.84rem', color: 'var(--ink-secondary)', marginTop: '3px' }}>
-                      {item.description}
-                    </div>
-                  </div>
-                </label>
-              );
-            })}
-          </div>
-        </section>
-      )}
-
-      <section className="unseen-card" aria-label="General Digital Safety Habits">
-        <h2 className="unseen-serif-h2" style={{ marginBottom: '12px' }}>
-          Everyday Creator Safety Habits
-        </h2>
-        <div style={{ display: 'grid', gap: '10px' }}>
-          {general.map((item) => {
-            const checked = props.checkedIds.has(item.id);
-            return (
-              <label
-                key={item.id}
+      <div className="unseen-split-grid">
+        {/* Left Column: Summary Metrics & Export Controls */}
+        <div className="unseen-col-stack">
+          <section
+            className="unseen-cream-card"
+            style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}
+          >
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'flex-start',
+                justifyContent: 'space-between',
+                gap: '10px',
+              }}
+            >
+              <div
                 style={{
                   display: 'flex',
-                  gap: '12px',
-                  alignItems: 'flex-start',
-                  padding: '12px 14px',
-                  borderRadius: '14px',
-                  border: '1px solid var(--border-sand)',
-                  background: checked ? '#f2faf6' : 'var(--bg-cream)',
-                  cursor: 'pointer',
+                  alignItems: 'center',
+                  gap: '10px',
+                  minWidth: 0,
                 }}
               >
-                <input
-                  type="checkbox"
-                  checked={checked}
-                  onChange={() => props.onToggleChecked(item.id)}
+                <div
                   style={{
-                    width: '18px',
-                    height: '18px',
-                    marginTop: '3px',
-                    accentColor: 'var(--accent-forest)',
+                    width: '40px',
+                    height: '40px',
+                    borderRadius: '50%',
+                    background: 'var(--card-well)',
+                    border: '1px solid var(--card-well-border)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: 'var(--card-ink)',
+                    flexShrink: 0,
                   }}
-                />
-                <div>
+                >
+                  <Fingerprint size={18} aria-hidden="true" />
+                </div>
+                <div style={{ minWidth: 0 }}>
                   <div
                     style={{
-                      fontWeight: 700,
-                      fontSize: '0.92rem',
-                      textDecoration: checked ? 'line-through' : 'none',
+                      fontSize: '0.86rem',
+                      fontWeight: 800,
+                      color: 'var(--card-ink)',
                     }}
                   >
-                    {item.title}
+                    Session Defense Progress
                   </div>
-                  <div style={{ fontSize: '0.84rem', color: 'var(--ink-secondary)', marginTop: '3px' }}>
-                    {item.description}
+                  <div
+                    className="unseen-mono-num"
+                    style={{
+                      fontSize: '0.75rem',
+                      color: 'var(--card-ink-muted)',
+                    }}
+                  >
+                    {totalCompleted}/{props.items.length} habits fortified
                   </div>
                 </div>
-              </label>
-            );
-          })}
+              </div>
+              <span className="unseen-pill platform">Active Triage</span>
+            </div>
+
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: '1fr 1fr',
+                gap: '10px',
+              }}
+            >
+              <div className="unseen-white-tile">
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    color: '#c53030',
+                  }}
+                >
+                  <AlertCircle size={15} aria-hidden="true" />
+                  <span
+                    className="unseen-mono-num"
+                    style={{
+                      fontSize: '1.45rem',
+                      fontWeight: 800,
+                      color: 'var(--card-ink)',
+                    }}
+                  >
+                    {personalized.length}
+                  </span>
+                </div>
+                <span
+                  style={{
+                    fontSize: '0.74rem',
+                    fontWeight: 600,
+                    color: 'var(--card-ink-muted)',
+                  }}
+                >
+                  Audit-Triggered
+                </span>
+              </div>
+
+              <div className="unseen-white-tile">
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    color: '#059669',
+                  }}
+                >
+                  <Shield size={15} aria-hidden="true" />
+                  <span
+                    className="unseen-mono-num"
+                    style={{
+                      fontSize: '1.45rem',
+                      fontWeight: 800,
+                      color: 'var(--card-ink)',
+                    }}
+                  >
+                    {general.length}
+                  </span>
+                </div>
+                <span
+                  style={{
+                    fontSize: '0.74rem',
+                    fontWeight: 600,
+                    color: 'var(--card-ink-muted)',
+                  }}
+                >
+                  Baseline Defenses
+                </span>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={handleDownload}
+              className="unseen-btn unseen-btn-dark unseen-btn-full"
+              style={{ minHeight: '46px' }}
+            >
+              <Download size={16} aria-hidden="true" />
+              <span>Download Best Practices (.md)</span>
+            </button>
+          </section>
+
+          <section
+            className="unseen-cream-card"
+            style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <div
+                style={{
+                  width: '40px',
+                  height: '40px',
+                  borderRadius: '50%',
+                  background: 'var(--card-ink)',
+                  color: 'var(--on-surface)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flexShrink: 0,
+                }}
+              >
+                <FileDown size={18} aria-hidden="true" />
+              </div>
+              <div>
+                <h3 className="unseen-card-title" style={{ fontSize: '1rem' }}>
+                  Take your safety checklist with you
+                </h3>
+                <span
+                  style={{
+                    fontSize: '0.74rem',
+                    color: 'var(--card-ink-muted)',
+                  }}
+                >
+                  Portable offline defense guide
+                </span>
+              </div>
+            </div>
+
+            <p
+              style={{
+                margin: 0,
+                fontSize: '0.78rem',
+                color: 'var(--card-ink-muted)',
+                lineHeight: 1.5,
+              }}
+            >
+              When you close this tab, your session and checklist progress are
+              immediately erased from memory. Export a local Markdown checklist
+              to keep your action plan.
+            </p>
+
+            {props.onResetChecked && (
+              <button
+                type="button"
+                onClick={props.onResetChecked}
+                className="unseen-btn unseen-btn-danger-soft unseen-btn-full"
+                style={{ minHeight: '42px', fontSize: '0.78rem' }}
+              >
+                <Flame size={15} aria-hidden="true" />
+                <span>Burn Checklist State Now</span>
+              </button>
+            )}
+          </section>
         </div>
-      </section>
+
+        {/* Right Column: Audit-Triggered & Everyday Habits */}
+        <div className="unseen-col-stack">
+          {personalized.length > 0 && (
+            <section
+              aria-label="Personalized Recommendations"
+              style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}
+            >
+              <div className="unseen-section-head">
+                <h2 className="unseen-section-title">
+                  Triggered by Your Audit
+                </h2>
+                <span className="unseen-pill cream unseen-mono-num">
+                  {personalized.length} Priority
+                </span>
+              </div>
+
+              <div
+                style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}
+              >
+                {personalized.map((item) => {
+                  const checked = props.checkedIds.has(item.id);
+                  return (
+                    <article
+                      key={item.id}
+                      className="unseen-cream-card compact"
+                      style={{
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '8px',
+                      }}
+                    >
+                      <div
+                        style={{
+                          display: 'flex',
+                          alignItems: 'flex-start',
+                          gap: '12px',
+                        }}
+                      >
+                        <button
+                          type="button"
+                          role="checkbox"
+                          aria-checked={checked}
+                          aria-label={`Mark "${item.title}" as completed`}
+                          onClick={() => props.onToggleChecked(item.id)}
+                          style={{
+                            width: '28px',
+                            height: '28px',
+                            borderRadius: '8px',
+                            marginTop: '2px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            flexShrink: 0,
+                            cursor: 'pointer',
+                            background: checked ? 'var(--card-ink)' : '#ffffff',
+                            color: checked
+                              ? 'var(--on-surface)'
+                              : 'var(--card-ink)',
+                            border: checked
+                              ? '1px solid var(--card-ink)'
+                              : '1px solid var(--card-well-border)',
+                          }}
+                        >
+                          {checked && (
+                            <Check
+                              size={15}
+                              strokeWidth={2.5}
+                              aria-hidden="true"
+                            />
+                          )}
+                        </button>
+
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          {item.triggeredByCategory && (
+                            <div style={{ marginBottom: '5px' }}>
+                              <span className="unseen-pill high">
+                                <span className="unseen-pill-dot" />
+                                {item.triggeredByCategory.replace(/_/g, ' ')}
+                              </span>
+                            </div>
+                          )}
+                          <h3
+                            className="unseen-card-title"
+                            style={{
+                              fontSize: '0.95rem',
+                              textDecoration: checked ? 'line-through' : 'none',
+                              opacity: checked ? 0.55 : 1,
+                            }}
+                          >
+                            {item.title}
+                          </h3>
+                          <p
+                            style={{
+                              margin: '5px 0 0',
+                              fontSize: '0.8rem',
+                              color: 'var(--card-ink-muted)',
+                              lineHeight: 1.5,
+                            }}
+                          >
+                            {item.description}
+                          </p>
+                        </div>
+                      </div>
+                    </article>
+                  );
+                })}
+              </div>
+            </section>
+          )}
+
+          <section
+            aria-label="General Digital Safety Habits"
+            style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}
+          >
+            <div className="unseen-section-head">
+              <h2 className="unseen-section-title">
+                Everyday Creator Safety Habits
+              </h2>
+              <span
+                style={{
+                  fontSize: '0.76rem',
+                  fontWeight: 600,
+                  color: 'var(--on-surface-variant)',
+                }}
+              >
+                Universal Protocol
+              </span>
+            </div>
+
+            <div
+              className="unseen-cream-card compact"
+              style={{
+                padding: '8px',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '4px',
+              }}
+            >
+              {general.map((item) => {
+                const checked = props.checkedIds.has(item.id);
+                return (
+                  <button
+                    key={item.id}
+                    type="button"
+                    role="checkbox"
+                    aria-checked={checked}
+                    onClick={() => props.onToggleChecked(item.id)}
+                    style={{
+                      width: '100%',
+                      textAlign: 'left',
+                      padding: '12px',
+                      borderRadius: '12px',
+                      border: 'none',
+                      background: checked ? 'rgba(234, 219, 206, 0.45)' : 'transparent',
+                      display: 'flex',
+                      alignItems: 'flex-start',
+                      gap: '12px',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    <span
+                      style={{
+                        width: '28px',
+                        height: '28px',
+                        borderRadius: '8px',
+                        marginTop: '1px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        flexShrink: 0,
+                        background: checked ? 'var(--card-ink)' : '#ffffff',
+                        color: checked
+                          ? 'var(--on-surface)'
+                          : 'var(--card-ink)',
+                        border: checked
+                          ? '1px solid var(--card-ink)'
+                          : '1px solid var(--card-well-border)',
+                      }}
+                    >
+                      {checked && (
+                        <Check size={15} strokeWidth={2.5} aria-hidden="true" />
+                      )}
+                    </span>
+
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div
+                        style={{
+                          fontSize: '0.88rem',
+                          fontWeight: 800,
+                          color: 'var(--card-ink)',
+                          lineHeight: 1.35,
+                          textDecoration: checked ? 'line-through' : 'none',
+                          opacity: checked ? 0.55 : 1,
+                        }}
+                      >
+                        {item.title}
+                      </div>
+                      <div
+                        style={{
+                          fontSize: '0.78rem',
+                          color: 'var(--card-ink-muted)',
+                          marginTop: '3px',
+                          lineHeight: 1.45,
+                        }}
+                      >
+                        {item.description}
+                      </div>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </section>
+        </div>
+      </div>
     </div>
   );
 }
