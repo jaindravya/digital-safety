@@ -16,6 +16,8 @@
 
 import {
   CreatorPost,
+  DeepfakeShieldMode,
+  DeepfakeShieldVerificationReport,
   PrivacyAuditReport,
   SafePostFixPlan,
 } from '../domain/privacyTypes';
@@ -147,6 +149,31 @@ export function createHttpPlatformBridge(
     async clearAuditLogs(): Promise<void> {
       logFunctionCall('httpBridge.clearAuditLogs', {});
       await requestJson(`${baseUrl}/api/logs/clear`, { method: 'POST' });
+    },
+
+    async loadDeepfakeShieldDemo(
+      mode: DeepfakeShieldMode = 'stealth',
+    ): Promise<DeepfakeShieldVerificationReport> {
+      logFunctionCall('httpBridge.loadDeepfakeShieldDemo', { mode });
+      const res = await requestJson<{ report: DeepfakeShieldVerificationReport }>(
+        `${baseUrl}/api/deepfake-shield/demo?mode=${encodeURIComponent(mode)}`,
+      );
+      return res.report;
+    },
+
+    async verifyDeepfakeShield(params): Promise<DeepfakeShieldVerificationReport> {
+      logFunctionCall('httpBridge.verifyDeepfakeShield', {
+        mode: params.mode ?? 'stealth',
+        attested: params.attestation.attestedByCreator,
+      });
+      const res = await requestJson<{ report: DeepfakeShieldVerificationReport }>(
+        `${baseUrl}/api/deepfake-shield/verify`,
+        {
+          method: 'POST',
+          body: JSON.stringify(params),
+        },
+      );
+      return res.report;
     },
   };
 }

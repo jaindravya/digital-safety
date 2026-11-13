@@ -24,11 +24,17 @@ import { APP_CONFIG } from '../config/appConfig';
 import {
   CreatorPost,
   CrossPlatformRisk,
+  DeepfakeShieldMode,
   PostDisclosureFinding,
 } from '../domain/privacyTypes';
 import { fetchAndExtractArticlePost } from '../features/article-import/articleExtractor';
 import { runFullPrivacyAudit } from '../features/audit-pipeline/privacyAuditOrchestrator';
 import { generateSafePostFixPlan } from '../features/caption-rewriter/captionRewriter';
+import {
+  getDemoDeepfakeShieldReport,
+  verifyDeepfakeDefenseWithGemini,
+} from '../features/deepfake-shield/deepfakeShieldService';
+import { loadDemoShieldScreenshotsFromPublicDir } from '../features/deepfake-shield/nodeDeepfakeShieldHydrator';
 import {
   getMayaCreatorPersona,
   getMayaSamplePosts,
@@ -95,6 +101,40 @@ export async function handleApiRequest(
         persona: getMayaCreatorPersona(),
         posts: getMayaSamplePosts(),
       });
+      return true;
+    }
+
+    if (method === 'GET' && pathname === '/api/deepfake-shield/demo') {
+      const modeParam = parsedUrl.searchParams.get('mode');
+      const mode: DeepfakeShieldMode =
+        modeParam === 'balanced' || modeParam === 'max' ? modeParam : 'stealth';
+      const report = getDemoDeepfakeShieldReport(mode);
+      sendJsonResponse(res, 200, { report });
+      return true;
+    }
+
+    if (method === 'POST' && pathname === '/api/deepfake-shield/verify') {
+      const body = await readJsonBody<{
+        mode?: DeepfakeShieldMode;
+        cleanScreenshotDataUrl?: string;
+        protectedScreenshotDataUrl?: string;
+        attestation?: OwnershipAttestation;
+      }>(req);
+
+      const mode: DeepfakeShieldMode =
+        body.mode === 'balanced' || body.mode === 'max' ? body.mode : 'stealth';
+      const hydrated = loadDemoShieldScreenshotsFromPublicDir();
+
+      const report = await verifyDeepfakeDefenseWithGemini({
+        mode,
+        cleanScreenshotDataUrl:
+          body.cleanScreenshotDataUrl ?? hydrated.cleanScreenshotDataUrl,
+        protectedScreenshotDataUrl:
+          body.protectedScreenshotDataUrl ??
+          hydrated.protectedScreenshotDataUrl,
+        attestation: body.attestation as OwnershipAttestation,
+      });
+      sendJsonResponse(res, 200, { report });
       return true;
     }
 
