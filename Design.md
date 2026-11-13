@@ -50,9 +50,13 @@ To ship a native **macOS Desktop Studio App** today while keeping a zero-rewrite
   - `CrossPlatformRisk`: Stage 2 compound exposure findings linking evidence across multiple posts without inferring exact private addresses.
   - `SafePostFixPlan`: Stage 3 voice-preserving caption rewrites, visual redaction regions, and post-timing recommendations.
 
-### 3.5 Responsible AI Guardrails (`src/features/guardrails/`) — *Planned (Chunk 2)*
-- **Ownership Self-Attestation:** Confirms the creator owns or is authorized to audit the uploaded content.
-- **Anti-Doxxing Output Sanitizer:** Prevents any model output from surfacing inferred street addresses, GPS coordinates, or surveillance maps.
+### 3.5 Responsible AI Guardrails (`src/features/guardrails/`) — *Implemented*
+- **Ownership Self-Attestation (`ownershipConsent.ts`):** Requires explicit creator confirmation (`assertOwnershipAttestation`) before any scan or rewrite executes, preventing third-party surveillance use.
+- **Anti-Doxxing Output Sanitizer (`antiDoxxingGuardrail.ts`):** Deterministically scrubs exact street addresses, apartment/room identifiers, and raw GPS coordinates across Stage 1 clues, Stage 2 cross-platform risks, and Stage 3 fix plans, and clamps normalized bounding boxes to `0..1000`.
+
+### 3.6 Fictional Cross-Platform Creator Dataset (`src/features/demo-dataset/`) — *Implemented*
+- **Maya Lin Feed (`mayaCreatorFeed.ts`):** Platform-agnostic 6-post synthetic dataset spanning `instagram`, `youtube`, `substack`, and `draft` (`maya-post-1` through `maya-post-6`) paired with `1000×1000` `image/png` sample assets in `public/demo-media/`.
+- **Node/Electron Media Hydrator (`nodeDemoMediaHydrator.ts`):** Resolves `/demo-media/*.png` files from `public/` into base64 `imageDataUrl` payloads for multimodal `@google/genai` `inlineData` analysis without polluting platform-agnostic modules with Node `fs` imports.
 
 ### 3.6 3-Stage Gemini Multimodal Pipeline (`src/genai/` & `src/features/`) — *Planned (Chunk 3)*
 - **Stage 1 (`postScanner.ts`):** Multimodal vision + caption + timestamp extraction per post.

@@ -63,6 +63,7 @@ export interface CreatorPost {
   readonly postedAtLabel: string;
   readonly isDraft: boolean;
   readonly imageDataUrl?: string;
+  readonly mediaAssetPath?: string;
   readonly mediaMimeType?: string;
   readonly mediaAltDescription: string;
 }
