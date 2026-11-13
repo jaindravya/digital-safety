@@ -34,7 +34,7 @@ import { stripInlineData } from '../src/logging/payloadSanitizer';
 describe('Unseen Foundation — Centralized Config', () => {
   it('exposes immutable Gemini model defaults and anti-doxxing patterns', () => {
     expect(APP_CONFIG.appName).toBe('Unseen');
-    expect(APP_CONFIG.genai.postScanModel).toBe('gemini-2.5-flash');
+    expect(APP_CONFIG.genai.postScanModel).toBe('gemini-3.8-flash');
     expect(APP_CONFIG.genai.boundingBoxCoordinateScale).toBe(1000);
     expect(APP_CONFIG.guardrails.requireOwnershipAttestation).toBe(true);
     expect(Object.isFrozen(APP_CONFIG)).toBe(true);
@@ -169,7 +169,7 @@ describe('Unseen Foundation — INFO Function & GenAI Logger', () => {
 
     expect(entry.level).toBe('INFO');
     expect(entry.category).toBe('GENAI_CALL');
-    expect(entry.details.model).toBe('gemini-2.5-flash');
+    expect(entry.details.model).toBe('gemini-3.8-flash');
     expect(entry.details.config).toEqual({
       temperature: 0.1,
       responseMimeType: 'application/json',

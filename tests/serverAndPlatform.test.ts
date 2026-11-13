@@ -83,7 +83,7 @@ describe('Unified Server — API Routes & Guardrail Enforcement', () => {
     });
     expect(health.statusCode).toBe(200);
     expect(health.json.appName).toBe('Unseen');
-    expect(health.json.model).toBe('gemini-2.5-flash');
+    expect(health.json.model).toBe('gemini-3.8-flash');
 
     const demo = await invokeApiRouteInMemory({
       method: 'GET',

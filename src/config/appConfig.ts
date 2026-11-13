@@ -116,7 +116,7 @@ export function readEnvVariable(key: string): string | undefined {
 export function createAppConfig(): UnseenConfig {
   const modelOverride = readEnvVariable('UNSEEN_GEMINI_MODEL');
   const fallbackFlag = readEnvVariable('UNSEEN_ENABLE_DEMO_FALLBACK');
-  const defaultModel = modelOverride ?? 'gemini-2.5-flash';
+  const defaultModel = modelOverride ?? 'gemini-3.8-flash';
 
   return Object.freeze({
     appName: 'Unseen',

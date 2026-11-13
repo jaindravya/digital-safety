@@ -32,7 +32,7 @@ To ship a native **macOS Desktop Studio App** today while keeping a zero-rewrite
 ## 3. Feature Catalog
 
 ### 3.1 Centralized Configuration (`src/config/appConfig.ts`) — *Implemented*
-- Centralizes Gemini model selection (`gemini-2.5-flash`), per-stage temperatures, redaction blur intensity, macOS/mobile viewport constants, log retention limits, and supported creator platforms.
+- Centralizes Gemini model selection (`gemini-3.8-flash`), per-stage temperatures, redaction blur intensity, macOS/mobile viewport constants, log retention limits, and supported creator platforms.
 - Provides typed helper functions to resolve runtime overrides safely.
 
 ### 3.2 Inline-Data Payload Sanitizer (`src/logging/payloadSanitizer.ts`) — *Implemented*
