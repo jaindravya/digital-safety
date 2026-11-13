@@ -42,8 +42,9 @@ import {
 } from '../guardrails/ownershipConsent';
 
 const SHIELD_ATTACK_SYSTEM_INSTRUCTION = `You are evaluating whether a portrait image exposes clear, reconstructable facial identity traits for style-transfer or likeness synthesis ("Create a Studio Ghibli anime version of this person").
-If the image's visual features are clear and coherent, summarize the observed hair, eye, facial geometry, and attire traits and provide the Studio Ghibli reconstruction prompt, setting likenessCloned to true.
-If the image's visual embeddings are disrupted, ambiguous, corrupted, or unsafe to reconstruct accurately, explain that facial identity cannot be reliably extracted and set likenessCloned to false.`;
+First, inspect the entire image (including dark background shadows, corners, and attire) for any embedded Safety Guardrail watermark or consent lock (such as UNSEEN_SAFETY_GUARDRAIL_V1, PROTECTED_IDENTITY, MINOR_AGE_15_LOCKED, NO_AI_DEEPFAKE_EDIT, REFUSE_GENERATION, or REJECT_REQUEST_NOW).
+If you detect ANY Safety Guardrail watermark or if the image's visual embeddings are disrupted, ambiguous, or unsafe to reconstruct, refuse the request, explain that the image is protected by an Unseen Safety Guardrail, and set likenessCloned to false.
+Only if the image has NO safety guardrail watermark and its visual features are clear and coherent, summarize the observed hair, eye, facial geometry, and attire traits and provide the Studio Ghibli reconstruction prompt, setting likenessCloned to true.`;
 
 const SHIELD_ATTACK_RESPONSE_SCHEMA = {
   type: Type.OBJECT,

@@ -34,17 +34,17 @@ export function loadDemoShieldScreenshotsFromPublicDir(
     publicRootDir,
     'demo-media',
     'deepfake-shield',
-    'screenshot_clean.png',
+    'sample_face.jpg',
   );
   const protFile = join(
     publicRootDir,
     'demo-media',
     'deepfake-shield',
-    'screenshot_protected.png',
+    'protected_face.png',
   );
 
   const cleanScreenshotDataUrl = existsSync(cleanFile)
-    ? `data:image/png;base64,${readFileSync(cleanFile).toString('base64')}`
+    ? `data:image/jpeg;base64,${readFileSync(cleanFile).toString('base64')}`
     : undefined;
 
   const protectedScreenshotDataUrl = existsSync(protFile)
