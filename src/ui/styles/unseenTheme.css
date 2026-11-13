@@ -170,15 +170,23 @@ a:focus-visible {
 }
 
 .unseen-logo-mark {
-  width: 30px;
-  height: 30px;
-  border-radius: 7px;
-  background: var(--surface-container);
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: transparent;
   border: 1px solid var(--outline-variant);
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  overflow: hidden;
   flex-shrink: 0;
+}
+
+.unseen-logo-img {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: cover;
 }
 
 .unseen-brand-row {
@@ -899,6 +907,69 @@ a:focus-visible {
   .unseen-toast {
     bottom: 78px;
   }
+}
+
+/* Tab 4: Photo Noise Shield */
+.unseen-upload-dropzone {
+  width: 100%;
+  min-height: 112px;
+  padding: 18px 16px;
+  border-radius: var(--radius-md);
+  border: 2px dashed var(--card-well-border);
+  background: var(--card-sand);
+  color: var(--card-ink);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  text-align: center;
+  cursor: pointer;
+  transition: border-color 0.16s ease, background-color 0.16s ease;
+}
+
+.unseen-upload-dropzone:hover {
+  border-color: var(--card-ink);
+  background: #ffffff;
+}
+
+.unseen-range {
+  width: 100%;
+  accent-color: var(--card-ink);
+  cursor: pointer;
+}
+
+.unseen-noise-preview-frame {
+  width: 100%;
+  background: var(--surface-dim);
+  border: 1px solid var(--card-well-border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  max-height: 440px;
+}
+
+.unseen-noise-preview-frame img {
+  display: block;
+  width: 100%;
+  max-height: 440px;
+  object-fit: contain;
+}
+
+.unseen-noise-empty-state {
+  min-height: 240px;
+  border-radius: var(--radius-md);
+  border: 1px dashed var(--card-well-border);
+  background: var(--card-sand);
+  color: var(--card-ink-muted);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 24px;
 }
 
 ::-webkit-scrollbar {
