@@ -75,5 +75,16 @@ To ship a native **macOS Desktop Studio App** today while keeping a zero-rewrite
 - **Platform Bridge (`src/platform/platformBridge.ts` & `httpPlatformAdapter.ts`):** Decouples React screens from transport details so the UI stays portable across Android PWA, Mac browsers, and future native shells.
 - **Installable Android & iOS PWA (`public/manifest.webmanifest`, `public/sw.js`, `public/icons/`):** Enables native "Install App" on Android Chrome with custom `192×192` and `512×512` icons while intentionally never caching sensitive `/api/*` payloads.
 
-### 3.10 Retro + Robinhood Creator Studio & Mobile UI (`src/ui/`) — *Planned (Chunks 5–6)*
-- Consent Gate, Camera Roll uploader, Blog/Substack URL importer, `0–100` Exposure Gauge, `"With X% confidence..."` cross-platform cards, interactive Smart Blur/Crop canvas, Voice-Preserving Caption Studio, Before/After preview, downloadable Best Practices checklist, and live `INFO` Audit Log inspector.
+### 3.10 Retro + Robinhood Creator Studio & Android Mobile UI (`src/ui/` & `src/features/`) — *Implemented*
+- **Camera Roll Validator & Reader (`src/features/upload/cameraRollReader.ts`):** Validates original image uploads (`JPG`, `PNG`, `WebP`, `HEIC` up to `20MB`) and rejects videos with a friendly V1 roadmap message.
+- **Canvas Smart Redactor (`src/features/image-redactor/canvasImageRedactor.ts`):** Maps Gemini `0..1000` `[ymin, xmin, ymax, xmax]` boxes to image pixel space and renders irreversible pixelation + Gaussian blur with local PNG export.
+- **Checklist Exporter (`src/features/best-practices/checklistExporter.ts`):** Formats and downloads personalized + general digital safety checklists locally with zero server storage.
+- **Interactive UI Screens (`src/ui/components/`):**
+  - `ConsentBannerCard.tsx`: Self-audit T&C ownership gate.
+  - `ContentIntakeView.tsx`: Camera-roll multi-photo picker, Substack/blog URL importer, and 1-tap sample feed loader.
+  - `ExposureScoreGauge.tsx` & `RiskReportView.tsx`: `0–100` Detected Exposure Index arc gauge, `"With X% confidence..."` connected cross-platform insight cards, contributing thumbnails, and anonymous Thumbs Up/Down feedback.
+  - `SafeFixStudioModal.tsx`: Side-by-side Before/After Smart Blur + custom creator drag-box oversight + 3 Gemini voice-preserving caption rewrites + safe timing badge.
+  - `BestPracticesView.tsx`: Ephemeral session checkboxes + 1-tap download.
+
+### 3.11 Live AI Observability Drawer & Final Demo Polish — *Planned (Chunk 6)*
+- Transparent slide-out `INFO` Function & GenAI Audit Log inspector (`inlineData` stripped) + Responsible AI limitations summary.
