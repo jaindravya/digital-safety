@@ -58,10 +58,16 @@ To ship a native **macOS Desktop Studio App** today while keeping a zero-rewrite
 - **Maya Lin Feed (`mayaCreatorFeed.ts`):** Platform-agnostic 6-post synthetic dataset spanning `instagram`, `youtube`, `substack`, and `draft` (`maya-post-1` through `maya-post-6`) paired with `1000×1000` `image/png` sample assets in `public/demo-media/`.
 - **Node/Electron Media Hydrator (`nodeDemoMediaHydrator.ts`):** Resolves `/demo-media/*.png` files from `public/` into base64 `imageDataUrl` payloads for multimodal `@google/genai` `inlineData` analysis without polluting platform-agnostic modules with Node `fs` imports.
 
-### 3.6 3-Stage Gemini Multimodal Pipeline (`src/genai/` & `src/features/`) — *Planned (Chunk 3)*
-- **Stage 1 (`postScanner.ts`):** Multimodal vision + caption + timestamp extraction per post.
-- **Stage 2 (`riskConnector.ts`):** Cross-platform pattern synthesis (recurring routines, live whereabouts, visual PII).
-- **Stage 3 (`captionRewriter.ts`):** Creator-voice caption alternatives + scheduling guidance.
+### 3.7 Blog & Substack Article Importer (`src/features/article-import/articleExtractor.ts`) — *Implemented*
+- Validates public `http`/`https` article links while blocking loopback and private network SSRF targets (`localhost`, `127.*`, `10.*`, `192.168.*`, `169.254.*`).
+- Strips scripts, styles, and navigation chrome from HTML to extract clean titles and prose, packaging newsletters/blogs into `CreatorPost` items for cross-platform routine detection alongside camera-roll photos.
 
-### 3.7 Native macOS Shell & Creator Studio UI (`electron/` & `src/ui/`) — *Planned (Chunks 4–6)*
-- Native macOS desktop window, drag-and-drop post upload, connected risk evidence cards, interactive blur/crop canvas studio, Before/After preview, and Responsible AI limitations + live log inspector.
+### 3.8 3-Stage Gemini Multimodal Engine & Deterministic Scorer (`src/genai/` & `src/features/`) — *Implemented*
+- **Gemini Client (`src/genai/geminiClient.ts`):** Wraps `@google/genai` structured JSON generation, converts base64 data URLs to `inlineData` parts, and automatically logs every call via `logGenAiCall` with `inlineData` stripped.
+- **Stage 1 (`postScanner.ts`):** Multimodal vision + caption/article text + timestamp scan returning structured clues and `0..1000` `[ymin, xmin, ymax, xmax]` bounding boxes for sensitive visual objects.
+- **Stage 2 (`riskConnector.ts`) & Deterministic Scorer (`riskScoringEngine.ts`):** Connects clues across photos and articles into `CrossPlatformRisk` items with privacy-preserving `"With X% confidence..."` abstract statements, deterministic `low`/`medium`/`high` priority & `0–100` exposure scoring, and scan-triggered **Personalized Best Practices**.
+- **Stage 3 (`captionRewriter.ts`):** Produces 3 creator-voice caption rewrites, carries forward visual redaction boxes, and recommends publish timing (`SafePostFixPlan`).
+- **Audit Orchestrator (`privacyAuditOrchestrator.ts`):** Coordinates consent verification, Stage 1, Stage 2, deterministic scoring, and anti-doxxing output scrubbing.
+
+### 3.9 Unified Android Mobile PWA & Mac Studio App (`server/` & `src/ui/`) — *Planned (Chunks 4–6)*
+- Single-port Node/Express server + installable Android/iOS Progressive Web App & Mac Studio view with Camera Roll upload, Article URL import, connected risk cards, interactive Smart Blur/Crop canvas, Before/After preview, downloadable Best Practices checklist, and live Audit Log inspector.

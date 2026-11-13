@@ -4,24 +4,26 @@
  *
  * Feature Overview:
  * Defines the strongly typed data structures shared across every stage of the
- * Unseen workflow—from creator-submitted multi-platform posts (`CreatorPost`),
- * to Stage 1 multimodal per-post disclosures with normalized bounding boxes
- * (`PostDisclosureFinding`), Stage 2 cumulative cross-platform risk connections
- * (`CrossPlatformRisk`), and Stage 3 pre-publication fixes (`SafePostFixPlan`).
+ * Unseen workflow—from camera-roll photo uploads and imported blog/Substack articles
+ * (`CreatorPost`), to Stage 1 multimodal per-post disclosures with normalized
+ * bounding boxes (`PostDisclosureFinding`), Stage 2 cumulative cross-platform
+ * confidence insights (`CrossPlatformRisk`), deterministic exposure scoring and
+ * personalized best practices (`BestPracticeRecommendation`), and Stage 3
+ * pre-publication fixes (`SafePostFixPlan`).
  *
  * Primary Use Cases:
  * 1. Enforcing strict schema alignment between `@google/genai` JSON outputs and
  *    TypeScript business logic.
- * 2. Sharing identical domain contracts between the macOS Electron app and future
- *    iOS/Android mobile builds without any platform-specific imports.
- * 3. Tracking human-in-the-loop resolution state ("exposures addressed") without
- *    fabricating a misleading percentage "privacy safety score."
+ * 2. Sharing identical domain contracts across Android mobile PWA, macOS Studio
+ *    views, and Node backend endpoints without platform-specific imports.
+ * 3. Combining privacy-preserving confidence insights ("With 89% confidence...")
+ *    with actionable pre-post edits and downloadable safety checklists.
  */
 
 import { SUPPORTED_PLATFORMS } from '../config/appConfig';
 
 /**
- * Union of creator platforms supported by Unseen.
+ * Union of creator content sources supported by Unseen.
  */
 export type CreatorPlatform = (typeof SUPPORTED_PLATFORMS)[number];
 
@@ -53,7 +55,8 @@ export interface NormalizedBoundingBox {
 }
 
 /**
- * Represents a creator-owned published post or unpublished draft submitted for self-audit.
+ * Represents a creator-owned camera-roll photo, published post, imported blog/Substack
+ * article, or unpublished draft submitted for self-audit.
  */
 export interface CreatorPost {
   readonly id: string;
@@ -62,6 +65,7 @@ export interface CreatorPost {
   readonly caption: string;
   readonly postedAtLabel: string;
   readonly isDraft: boolean;
+  readonly sourceUrl?: string;
   readonly imageDataUrl?: string;
   readonly mediaAssetPath?: string;
   readonly mediaMimeType?: string;
@@ -69,12 +73,13 @@ export interface CreatorPost {
 }
 
 /**
- * Single privacy-relevant clue extracted from an individual post in Stage 1.
+ * Single privacy-relevant clue extracted from an individual post or article in Stage 1.
  */
 export interface PostDisclosureClue {
   readonly category: DisclosureCategory;
   readonly summary: string;
   readonly sourceModality: 'visual' | 'caption' | 'timestamp' | 'combined';
+  readonly confidencePercentage?: number;
   readonly timeCue?: string;
   readonly placeTypeCue?: string;
   readonly boundingBox?: NormalizedBoundingBox;
@@ -90,14 +95,17 @@ export interface PostDisclosureFinding {
 }
 
 /**
- * Stage 2 cross-platform privacy risk synthesizing one or more contributing posts
- * to explain cumulative exposure without inferring exact addresses or coordinates.
+ * Stage 2 cross-platform privacy risk synthesizing one or more contributing posts/articles
+ * with privacy-preserving confidence statements ("With X% confidence...") and zero raw addresses.
  */
 export interface CrossPlatformRisk {
   readonly id: string;
   readonly title: string;
   readonly category: DisclosureCategory;
   readonly priority: RiskPriority;
+  readonly confidencePercentage?: number;
+  readonly occurrenceCount?: number;
+  readonly abstractConfidenceStatement?: string;
   readonly contributingPostIds: readonly string[];
   readonly platformsInvolved: readonly CreatorPlatform[];
   readonly whyItMatters: string;
@@ -105,6 +113,18 @@ export interface CrossPlatformRisk {
   readonly recommendedActionSummary: string;
   readonly safetyReferenceNote: string;
   readonly status: 'needs_review' | 'addressed';
+}
+
+/**
+ * Personalized or general digital safety habit item surfaced alongside audit results
+ * and exportable as a local checklist.
+ */
+export interface BestPracticeRecommendation {
+  readonly id: string;
+  readonly title: string;
+  readonly description: string;
+  readonly kind: 'personalized' | 'general';
+  readonly triggeredByCategory?: DisclosureCategory;
 }
 
 /**
@@ -143,13 +163,16 @@ export interface AppliedPostSafetyFix {
 }
 
 /**
- * Aggregate result of running the full Unseen audit across a creator's feed.
+ * Aggregate result of running the full Unseen audit across a creator's photos and articles.
  */
 export interface PrivacyAuditReport {
   readonly auditedAtIso: string;
   readonly postsReviewedCount: number;
+  readonly overallExposureScore?: number;
+  readonly overallSeverityBand?: RiskPriority;
   readonly postFindings: readonly PostDisclosureFinding[];
   readonly crossPlatformRisks: readonly CrossPlatformRisk[];
+  readonly bestPractices?: readonly BestPracticeRecommendation[];
   readonly limitationsNotice: string;
   readonly usedDemoFallback: boolean;
 }

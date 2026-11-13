@@ -128,6 +128,9 @@ export function sanitizeCrossPlatformRisk(
   return {
     ...risk,
     title: sanitizeLocationSensitiveText(risk.title),
+    abstractConfidenceStatement: risk.abstractConfidenceStatement
+      ? sanitizeLocationSensitiveText(risk.abstractConfidenceStatement)
+      : undefined,
     whyItMatters: sanitizeLocationSensitiveText(risk.whyItMatters),
     combinedEvidenceSummary: sanitizeLocationSensitiveText(
       risk.combinedEvidenceSummary,
@@ -169,6 +172,13 @@ export function enforceReportAntiDoxxing(
     ...report,
     postFindings: sanitizedFindings,
     crossPlatformRisks: sanitizedRisks,
+    bestPractices: report.bestPractices
+      ? report.bestPractices.map((item) => ({
+          ...item,
+          title: sanitizeLocationSensitiveText(item.title),
+          description: sanitizeLocationSensitiveText(item.description),
+        }))
+      : undefined,
     limitationsNotice: sanitizeLocationSensitiveText(report.limitationsNotice),
   };
 }

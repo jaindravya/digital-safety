@@ -4,26 +4,29 @@
  *
  * Feature Overview:
  * Consolidates every configurable parameter across Unseen—including Google
- * Gemini model identifiers, stage-specific generation temperatures, image redaction
- * constants, logging ring-buffer limits, native macOS window dimensions, mobile
- * companion preview sizes, and anti-doxxing guardrail patterns—into one typed module.
+ * Gemini model identifiers, stage-specific generation temperatures, deterministic
+ * exposure scoring thresholds, blog/article import limits, image redaction constants,
+ * logging ring-buffer limits, viewport dimensions, and anti-doxxing guardrail
+ * patterns—into one immutable, typed module.
  *
  * Primary Use Cases:
  * 1. Ensuring zero hardcoded model strings or magic numbers are scattered across
- *    Gemini pipeline stages, guardrails, or UI views.
+ *    Gemini pipeline stages, deterministic scoring, guardrails, or UI views.
  * 2. Allowing environment overrides (e.g., switching Gemini models or toggling
  *    hackathon Wi-Fi fallback mode) from a single validated entry point.
- * 3. Sharing identical configuration defaults between the macOS Electron app today
- *    and iOS/Android mobile builds later.
+ * 3. Sharing identical configuration defaults across Android mobile PWA, macOS
+ *    Studio view, and Node backend routes.
  */
 
 /**
- * Supported creator content platforms analyzed by Unseen.
+ * Supported creator content sources analyzed by Unseen.
  */
 export const SUPPORTED_PLATFORMS = [
+  'camera_roll',
   'instagram',
   'youtube',
   'substack',
+  'blog',
   'draft',
 ] as const;
 
@@ -42,6 +45,22 @@ export interface UnseenConfig {
     readonly captionRewriteTemperature: number;
     readonly boundingBoxCoordinateScale: number;
     readonly enableDemoFallbackOnMissingKey: boolean;
+  };
+  readonly articleImport: {
+    readonly fetchTimeoutMs: number;
+    readonly maxExtractedTextChars: number;
+    readonly maxHtmlBytes: number;
+    readonly userAgent: string;
+  };
+  readonly scoring: {
+    readonly lowOccurrenceThreshold: number;
+    readonly mediumOccurrenceThreshold: number;
+    readonly highOccurrenceThreshold: number;
+    readonly lowBandMaxScore: number;
+    readonly mediumBandMaxScore: number;
+    readonly highPriorityWeight: number;
+    readonly mediumPriorityWeight: number;
+    readonly lowPriorityWeight: number;
   };
   readonly logging: {
     readonly defaultLevel: 'INFO';
@@ -68,8 +87,8 @@ export interface UnseenConfig {
 }
 
 /**
- * Safely reads an environment variable across Node/Electron and browser/mobile
- * bundler environments without throwing ReferenceError when `process` is absent.
+ * Safely reads an environment variable across Node and browser/mobile bundler
+ * environments without throwing ReferenceError when `process` is absent.
  *
  * @param key - Name of the environment variable to look up.
  * @returns Trimmed string value if defined and non-empty, or `undefined`.
@@ -109,6 +128,22 @@ export function createAppConfig(): UnseenConfig {
       captionRewriteTemperature: 0.65,
       boundingBoxCoordinateScale: 1000,
       enableDemoFallbackOnMissingKey: fallbackFlag !== 'false',
+    }),
+    articleImport: Object.freeze({
+      fetchTimeoutMs: 8000,
+      maxExtractedTextChars: 6000,
+      maxHtmlBytes: 750_000,
+      userAgent: 'UnseenSafetyAuditor/0.1 (+https://github.com/jaindravya/digital-safety)',
+    }),
+    scoring: Object.freeze({
+      lowOccurrenceThreshold: 2,
+      mediumOccurrenceThreshold: 3,
+      highOccurrenceThreshold: 5,
+      lowBandMaxScore: 33,
+      mediumBandMaxScore: 66,
+      highPriorityWeight: 30,
+      mediumPriorityWeight: 18,
+      lowPriorityWeight: 10,
     }),
     logging: Object.freeze({
       defaultLevel: 'INFO' as const,
