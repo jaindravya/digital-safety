@@ -1,6 +1,6 @@
 /**
  * @file vitest.config.ts
- * @description Centralized test runner configuration for PrivacyMirror.
+ * @description Centralized test runner configuration for Unseen.
  *
  * Feature Overview:
  * Configures Vitest to execute automated unit and integration suites across the

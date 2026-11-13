@@ -1,11 +1,11 @@
 /**
  * @file src/features/guardrails/antiDoxxingGuardrail.ts
- * @description Defensive post-processing guardrail that prevents PrivacyMirror outputs
+ * @description Defensive post-processing guardrail that prevents Unseen outputs
  * from inferring, echoing, or displaying exact street addresses, apartment/unit numbers,
  * or raw GPS coordinates.
  *
  * Feature Overview:
- * A core Responsible Design requirement of PrivacyMirror is explaining *categories* of
+ * A core Responsible Design requirement of Unseen is explaining *categories* of
  * unintended exposure (e.g., "visible shipping label in corner", "recurring Tuesday
  * café routine") without ever turning into a doxxing or geolocation tool that outputs
  * inferred residential addresses or exact coordinates. Even though Gemini system

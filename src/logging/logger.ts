@@ -1,7 +1,7 @@
 /**
  * @file src/logging/logger.ts
  * @description Centralized `INFO` observability logger for all function invocations
- * and Google GenAI multimodal calls across PrivacyMirror.
+ * and Google GenAI multimodal calls across Unseen.
  *
  * Feature Overview:
  * Enforces project-wide auditability and debugging clarity by logging:
@@ -26,7 +26,7 @@ import { APP_CONFIG } from '../config/appConfig';
 import { stripInlineData } from './payloadSanitizer';
 
 /**
- * Categories of structured `INFO` log records emitted by PrivacyMirror.
+ * Categories of structured `INFO` log records emitted by Unseen.
  */
 export type LogEntryCategory = 'FUNCTION_CALL' | 'GENAI_CALL';
 

@@ -1,8 +1,8 @@
-# PrivacyMirror
+# Unseen
 
 **Your AI Digital Safety Assistant for Creators**
 
-> *"PrivacyMirror helps women creators see what their online presence unintentionally reveals about them, before that information can be used to compromise their privacy or safety."*
+> *"Unseen helps women creators see what their online presence unintentionally reveals about them, before that information can be used to compromise their privacy or safety."*
 
 Built at the **Ruth & Google AI for Social Good Hackathon (Los Angeles)**.
 
@@ -19,7 +19,7 @@ Individually, each post often looks completely harmless:
 - A **workspace photo** includes a shipping label or piece of mail in the corner.
 - A **draft caption** reveals the creator is still at an event in real time.
 
-Existing tools check account privacy settings, strip EXIF metadata, or scan a single image in isolation. **PrivacyMirror evaluates cumulative exposure across a creator's own cross-platform content**, grounded in digital safety guidance from organizations like [RAINN](https://www.rainn.org/) on limiting real-time location sharing and predictable routine disclosures.
+Existing tools check account privacy settings, strip EXIF metadata, or scan a single image in isolation. **Unseen evaluates cumulative exposure across a creator's own cross-platform content**, grounded in digital safety guidance from organizations like [RAINN](https://www.rainn.org/) on limiting real-time location sharing and predictable routine disclosures.
 
 ---
 
@@ -29,7 +29,7 @@ Existing tools check account privacy settings, strip EXIF metadata, or scan a si
 Creators upload or select their own content across **Instagram, YouTube, Substack**, and unpublished drafts. Gemini's multimodal understanding analyzes images, video frames, captions, and timestamps for subtle visual and contextual disclosures.
 
 ### 2. Connect Cumulative Risks Across Platforms
-Rather than flagging an isolated landmark, PrivacyMirror links disclosures across multiple posts to surface **compound privacy patterns**—such as predictable weekly routines, real-time whereabouts, or recurring background identifiers—with clear visual evidence showing which posts contributed.
+Rather than flagging an isolated landmark, Unseen links disclosures across multiple posts to surface **compound privacy patterns**—such as predictable weekly routines, real-time whereabouts, or recurring background identifiers—with clear visual evidence showing which posts contributed.
 
 ### 3. Fix It Before Posting
 Creators open any flagged post or draft in a pre-publication studio to:
@@ -40,9 +40,9 @@ Creators open any flagged post or draft in a pre-publication studio to:
 
 ---
 
-## What Makes PrivacyMirror Different
+## What Makes Unseen Different
 
-| Existing Privacy Tools | PrivacyMirror |
+| Existing Privacy Tools | Unseen |
 | :--- | :--- |
 | Checks account privacy toggles | Reviews what the content itself discloses |
 | Strips photo EXIF metadata | Analyzes visuals, backgrounds, captions, and timing together |
@@ -71,6 +71,6 @@ flowchart LR
 ## Responsible Design Principles
 
 1. **Strictly Self-Auditing:** Designed exclusively for creators reviewing content they own or are authorized to manage—never for surveilling third parties.
-2. **Anti-Doxxing Guardrails:** PrivacyMirror explains *categories* of exposure and highlights contributing posts, while strictly refusing to infer or output exact home addresses, coordinates, or movement maps.
-3. **Honest Limitations & Human Oversight:** Rather than promising a misleading "100% Privacy Score," PrivacyMirror tracks *addressed exposures*, communicates AI limitations clearly, and keeps creators in full control of every edit.
+2. **Anti-Doxxing Guardrails:** Unseen explains *categories* of exposure and highlights contributing posts, while strictly refusing to infer or output exact home addresses, coordinates, or movement maps.
+3. **Honest Limitations & Human Oversight:** Rather than promising a misleading "100% Privacy Score," Unseen tracks *addressed exposures*, communicates AI limitations clearly, and keeps creators in full control of every edit.
 4. **Ephemeral by Default:** Content uploaded for auditing is processed ephemerally without persistent cloud tracking of personal media.

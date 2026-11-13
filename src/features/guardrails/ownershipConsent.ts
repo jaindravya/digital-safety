@@ -3,7 +3,7 @@
  * @description Self-auditing ownership attestation and consent enforcement module.
  *
  * Feature Overview:
- * PrivacyMirror is strictly a self-auditing digital safety assistant—never a third-party
+ * Unseen is strictly a self-auditing digital safety assistant—never a third-party
  * investigation, stalking, or OSINT tool. Before any multimodal post scan or cross-platform
  * analysis can execute, the user must explicitly attest that they own or are authorized
  * to manage every piece of content submitted in the session.
@@ -39,7 +39,7 @@ export class OwnershipAttestationRequiredError extends Error {
    * @param message - Human-readable explanation suitable for creator UI display.
    */
   constructor(
-    message = 'Please confirm that you own or are authorized to manage these posts before running PrivacyMirror.',
+    message = 'Please confirm that you own or are authorized to manage these posts before running Unseen.',
   ) {
     super(message);
     this.name = 'OwnershipAttestationRequiredError';
@@ -50,7 +50,7 @@ export class OwnershipAttestationRequiredError extends Error {
  * Standard creator-facing attestation statement displayed in the Consent Gate.
  */
 export const DEFAULT_ATTESTATION_STATEMENT =
-  'I confirm that I am the creator or authorized manager of the uploaded content and am using PrivacyMirror solely for defensive self-auditing.';
+  'I confirm that I am the creator or authorized manager of the uploaded content and am using Unseen solely for defensive self-auditing.';
 
 /**
  * Creates an immutable `OwnershipAttestation` object recording whether the creator

@@ -1,6 +1,6 @@
 /**
  * @file tests/foundation.test.ts
- * @description Automated unit tests for PrivacyMirror Chunk 1 foundation modules:
+ * @description Automated unit tests for Unseen Chunk 1 foundation modules:
  * centralized configuration, inline-data payload sanitization, and structured
  * `INFO` function & GenAI call logging.
  *
@@ -31,18 +31,18 @@ import {
 } from '../src/logging/logger';
 import { stripInlineData } from '../src/logging/payloadSanitizer';
 
-describe('PrivacyMirror Foundation — Centralized Config', () => {
+describe('Unseen Foundation — Centralized Config', () => {
   it('exposes immutable Gemini model defaults and anti-doxxing patterns', () => {
-    expect(APP_CONFIG.appName).toBe('PrivacyMirror');
+    expect(APP_CONFIG.appName).toBe('Unseen');
     expect(APP_CONFIG.genai.postScanModel).toBe('gemini-2.5-flash');
     expect(APP_CONFIG.genai.boundingBoxCoordinateScale).toBe(1000);
     expect(APP_CONFIG.guardrails.requireOwnershipAttestation).toBe(true);
     expect(Object.isFrozen(APP_CONFIG)).toBe(true);
   });
 
-  it('respects PRIVACY_MIRROR_GEMINI_MODEL environment override', () => {
-    const previous = process.env.PRIVACY_MIRROR_GEMINI_MODEL;
-    process.env.PRIVACY_MIRROR_GEMINI_MODEL = 'gemini-2.5-pro';
+  it('respects UNSEEN_GEMINI_MODEL environment override', () => {
+    const previous = process.env.UNSEEN_GEMINI_MODEL;
+    process.env.UNSEEN_GEMINI_MODEL = 'gemini-2.5-pro';
 
     try {
       const customConfig = createAppConfig();
@@ -50,9 +50,9 @@ describe('PrivacyMirror Foundation — Centralized Config', () => {
       expect(customConfig.genai.riskConnectModel).toBe('gemini-2.5-pro');
     } finally {
       if (previous === undefined) {
-        delete process.env.PRIVACY_MIRROR_GEMINI_MODEL;
+        delete process.env.UNSEEN_GEMINI_MODEL;
       } else {
-        process.env.PRIVACY_MIRROR_GEMINI_MODEL = previous;
+        process.env.UNSEEN_GEMINI_MODEL = previous;
       }
     }
   });
@@ -71,7 +71,7 @@ describe('PrivacyMirror Foundation — Centralized Config', () => {
   });
 });
 
-describe('PrivacyMirror Foundation — Inline Data Payload Sanitizer', () => {
+describe('Unseen Foundation — Inline Data Payload Sanitizer', () => {
   it('strips @google/genai inlineData base64 image blobs while keeping text prompts intact', () => {
     const sampleBase64 = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=';
     const rawContents = [
@@ -119,7 +119,7 @@ describe('PrivacyMirror Foundation — Inline Data Payload Sanitizer', () => {
   });
 });
 
-describe('PrivacyMirror Foundation — INFO Function & GenAI Logger', () => {
+describe('Unseen Foundation — INFO Function & GenAI Logger', () => {
   beforeEach(() => {
     clearLogHistory();
   });

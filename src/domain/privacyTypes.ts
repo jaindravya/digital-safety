@@ -1,10 +1,10 @@
 /**
  * @file src/domain/privacyTypes.ts
- * @description Core platform-agnostic TypeScript domain contracts for PrivacyMirror.
+ * @description Core platform-agnostic TypeScript domain contracts for Unseen.
  *
  * Feature Overview:
  * Defines the strongly typed data structures shared across every stage of the
- * PrivacyMirror workflow—from creator-submitted multi-platform posts (`CreatorPost`),
+ * Unseen workflow—from creator-submitted multi-platform posts (`CreatorPost`),
  * to Stage 1 multimodal per-post disclosures with normalized bounding boxes
  * (`PostDisclosureFinding`), Stage 2 cumulative cross-platform risk connections
  * (`CrossPlatformRisk`), and Stage 3 pre-publication fixes (`SafePostFixPlan`).
@@ -21,7 +21,7 @@
 import { SUPPORTED_PLATFORMS } from '../config/appConfig';
 
 /**
- * Union of creator platforms supported by PrivacyMirror.
+ * Union of creator platforms supported by Unseen.
  */
 export type CreatorPlatform = (typeof SUPPORTED_PLATFORMS)[number];
 
@@ -143,7 +143,7 @@ export interface AppliedPostSafetyFix {
 }
 
 /**
- * Aggregate result of running the full PrivacyMirror audit across a creator's feed.
+ * Aggregate result of running the full Unseen audit across a creator's feed.
  */
 export interface PrivacyAuditReport {
   readonly auditedAtIso: string;

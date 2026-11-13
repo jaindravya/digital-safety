@@ -1,12 +1,12 @@
-# PrivacyMirror — System & Feature Design (`Design.md`)
+# Unseen — System & Feature Design (`Design.md`)
 
-**PrivacyMirror** is an AI-powered cross-platform digital safety assistant built for women content creators. It evaluates cumulative privacy exposure across a creator's own content (Instagram, YouTube, Substack, and unpublished drafts) and recommends practical, voice-preserving fixes before publishing.
+**Unseen** is an AI-powered cross-platform digital safety assistant built for women content creators. It evaluates cumulative privacy exposure across a creator's own content (Instagram, YouTube, Substack, and unpublished drafts) and recommends practical, voice-preserving fixes before publishing.
 
 ---
 
 ## 1. Architectural Principles (macOS App Now, Mobile-Ready Next)
 
-To ship a native **macOS Desktop Studio App** today while keeping a zero-rewrite path to **iOS and Android** mobile apps later, PrivacyMirror is strictly divided into three decoupled layers:
+To ship a native **macOS Desktop Studio App** today while keeping a zero-rewrite path to **iOS and Android** mobile apps later, Unseen is strictly divided into three decoupled layers:
 
 1. **Layer 1 — Platform-Agnostic Core (`src/config/`, `src/logging/`, `src/domain/`, `src/genai/`, `src/features/`):**
    - Pure TypeScript modules with zero DOM or Electron dependencies.

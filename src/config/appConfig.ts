@@ -1,9 +1,9 @@
 /**
  * @file src/config/appConfig.ts
- * @description Centralized configuration registry for the PrivacyMirror application.
+ * @description Centralized configuration registry for the Unseen application.
  *
  * Feature Overview:
- * Consolidates every configurable parameter across PrivacyMirror—including Google
+ * Consolidates every configurable parameter across Unseen—including Google
  * Gemini model identifiers, stage-specific generation temperatures, image redaction
  * constants, logging ring-buffer limits, native macOS window dimensions, mobile
  * companion preview sizes, and anti-doxxing guardrail patterns—into one typed module.
@@ -18,7 +18,7 @@
  */
 
 /**
- * Supported creator content platforms analyzed by PrivacyMirror.
+ * Supported creator content platforms analyzed by Unseen.
  */
 export const SUPPORTED_PLATFORMS = [
   'instagram',
@@ -28,9 +28,9 @@ export const SUPPORTED_PLATFORMS = [
 ] as const;
 
 /**
- * Strongly typed configuration contract for the entire PrivacyMirror runtime.
+ * Strongly typed configuration contract for the entire Unseen runtime.
  */
-export interface PrivacyMirrorConfig {
+export interface UnseenConfig {
   readonly appName: string;
   readonly appVersion: string;
   readonly genai: {
@@ -86,15 +86,19 @@ export function readEnvVariable(key: string): string | undefined {
  * Builds the immutable centralized configuration object, applying optional
  * environment variable overrides where supported.
  *
- * @returns Frozen `PrivacyMirrorConfig` instance used across all modules.
+ * @returns Frozen `UnseenConfig` instance used across all modules.
  */
-export function createAppConfig(): PrivacyMirrorConfig {
-  const modelOverride = readEnvVariable('PRIVACY_MIRROR_GEMINI_MODEL');
-  const fallbackFlag = readEnvVariable('PRIVACY_MIRROR_ENABLE_DEMO_FALLBACK');
+export function createAppConfig(): UnseenConfig {
+  const modelOverride =
+    readEnvVariable('UNSEEN_GEMINI_MODEL') ??
+    readEnvVariable('PRIVACY_MIRROR_GEMINI_MODEL');
+  const fallbackFlag =
+    readEnvVariable('UNSEEN_ENABLE_DEMO_FALLBACK') ??
+    readEnvVariable('PRIVACY_MIRROR_ENABLE_DEMO_FALLBACK');
   const defaultModel = modelOverride ?? 'gemini-2.5-flash';
 
   return Object.freeze({
-    appName: 'PrivacyMirror',
+    appName: 'Unseen',
     appVersion: '0.1.0',
     genai: Object.freeze({
       postScanModel: defaultModel,
@@ -136,4 +140,4 @@ export function createAppConfig(): PrivacyMirrorConfig {
 /**
  * Singleton centralized application configuration imported by core and UI modules.
  */
-export const APP_CONFIG: PrivacyMirrorConfig = createAppConfig();
+export const APP_CONFIG: UnseenConfig = createAppConfig();

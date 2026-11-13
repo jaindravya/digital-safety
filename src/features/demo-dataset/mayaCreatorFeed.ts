@@ -1,7 +1,7 @@
 /**
  * @file src/features/demo-dataset/mayaCreatorFeed.ts
  * @description Fictional creator persona and 6-post cross-platform dataset ("Maya Lin")
- * powering PrivacyMirror's interactive demo and automated end-to-end verification.
+ * powering Unseen's interactive demo and automated end-to-end verification.
  *
  * Feature Overview:
  * Models a realistic Los Angeles lifestyle, wellness, and music creator ("Maya Lin")
