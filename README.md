@@ -1,76 +1,186 @@
 # Unseen
 
-**Your AI Digital Safety Assistant for Creators**
+**See what your posts reveal together before someone else connects the dots.**
 
-> *"Unseen helps women creators see what their online presence unintentionally reveals about them, before that information can be used to compromise their privacy or safety."*
-
-Built at the **Ruth & Google AI for Social Good Hackathon (Los Angeles)**.
+**Unseen** is an AI-powered cross-platform digital safety and counter-OSINT assistant built for women content creators at the **Ruth & Google AI for Social Good Hackathon** in Los Angeles.
 
 ---
 
-## The Problem
+## Why Unseen Exists
 
-Women content creators build their careers by sharing pieces of their lives online—across Instagram Stories, YouTube vlogs, Substack essays, and more.
+Most women creators already know not to post their home street sign or driver's license. Real-world stalking and doxxing rarely happen from a single dramatic mistake—they happen **cumulatively across platforms**:
 
-Individually, each post often looks completely harmless:
-- An **Instagram Story** shows a morning coffee cup by a familiar neighborhood window.
-- A **YouTube vlog** catches two seconds of the street outside a fitness studio.
-- A **Substack newsletter** mentions writing at a favorite corner café every Tuesday morning.
-- A **workspace photo** includes a shipping label or piece of mail in the corner.
-- A **draft caption** reveals the creator is still at an event in real time.
+- An **Instagram Story** coffee cup sleeve from a neighborhood café on Tuesday at 8:15 AM
+- A **TikTok** walk-and-talk reflection showing a boutique Pilates studio awning two blocks away
+- A **Substack essay** mentioning *"living in a quiet duplex three minutes from my morning matcha spot"*—with an embedded original JPEG still carrying **EXIF GPS coordinates**
+- A **rooftop sunset photo** whose skyline triangulates the exact residential block
 
-Existing tools check account privacy settings, strip EXIF metadata, or scan a single image in isolation. **Unseen evaluates cumulative exposure across a creator's own cross-platform content**, grounded in digital safety guidance from organizations like [RAINN](https://www.rainn.org/) on limiting real-time location sharing and predictable routine disclosures.
+Evaluated alone, every post looks harmless. Evaluated **together**, an obsessive stranger can reconstruct a creator's home radius, weekly schedule, or real-time whereabouts. Grounded in safety guidance from **RAINN**, Unseen gives creators a private, zero-storage pre-flight check before—or after—they hit publish.
 
 ---
 
-## Product Experience
+## Core Capabilities
 
-### 1. Scan Your Online Presence
-Creators upload or select their own content across **Instagram, YouTube, Substack**, and unpublished drafts. Gemini's multimodal understanding analyzes images, video frames, captions, and timestamps for subtle visual and contextual disclosures.
+### 1. Multi-Source Creator Content Intake (`Intake`)
+- **Camera Roll Photo Upload:** Batch-audit original `JPEG`, `PNG`, `WebP`, and `HEIC` photos (`<= 20 MB` per file) directly from Mac or mobile Camera Roll.
+- **Public Blog & Substack URL Importer:** Fetches public essay text (`<article>`, `<main>`, OpenGraph metadata) **and** inspects embedded `<img>` photos inside the article for hidden EXIF metadata leaks.
+- **Draft Caption & Story Notes:** Paste upcoming captions, YouTube descriptions, or newsletter drafts before publishing.
+- **1-Tap Creator Demo Feed:** Instant 6-post cross-platform dataset (*Maya Lin — LA lifestyle creator across Instagram, TikTok, and Substack*) for live interactive judging.
 
-### 2. Connect Cumulative Risks Across Platforms
-Rather than flagging an isolated landmark, Unseen links disclosures across multiple posts to surface **compound privacy patterns**—such as predictable weekly routines, real-time whereabouts, or recurring background identifiers—with clear visual evidence showing which posts contributed.
+### 2. Binary EXIF GPS, Capture-Time & Device Metadata Scanner + Lossless Stripper
+- Inspects raw binary `APP1` TIFF/IFD (`IFD0`, `ExifIFD`, `GPSInfoIFD`), PNG `eXIf`/`iTXt`/`tEXt`, WebP `EXIF`/`XMP `, and HEIC `Exif` segments **before** stripping.
+- Detects hidden **GPS coordinates**, **original capture weekday/time windows**, and **camera/lens serial tags** without ever echoing raw coordinates into logs, prompts, or UI.
+- **Automatic Local Scrubbing:** Immediately strips EXIF/XMP/IPTC metadata in browser memory on upload and losslessly scrubs binary metadata on every Safe Export.
 
-### 3. Fix It Before Posting
-Creators open any flagged post or draft in a pre-publication studio to:
-- **Redact sensitive visuals** (blur or crop documents, mail, badges, or reflections).
-- **Rewrite captions in their own voice** (removing real-time or schedule cues without losing personality).
-- **Adjust publish timing** (delaying live travel or event posts until after leaving the location).
-- **Preview Before vs. After** so they can share confidently without sacrificing authenticity.
+### 3. 3-Stage Multimodal Google Gemini (`gemini-3.8-flash`) Pipeline (`Audit`)
+Powered by the official `@google/genai` SDK (`vertexai: false` with structured JSON schemas):
+1. **Stage 1 — Multimodal Clues & Small-PII Bounding Boxes:** Scans images, prose, and detected EXIF signals together. Extracts location, routine, visual PII, and proximity clues plus normalized `[0..1000]` bounding boxes strictly around **small redactable PII** (shipping labels, mail envelopes, badges, license plates, unit/apartment numbers, laptop screens).
+2. **Stage 2 — Cross-Platform Pattern Connector & `0–100` Exposure Index:** Correlates clues across posts to surface explainable `"With X% confidence..."` insights that cite **specific repeated venues, visual cues, and post titles** while strictly redacting private street addresses, apartment numbers, and raw GPS coordinates. Computes a deterministic `0–100` **Cumulative Exposure Index** (`Low` / `Moderate` / `High` / `Critical`).
+3. **Stage 3 — Context-Aware Safe Fix Studio (`Make Post Safer`):**
+   - **Small Redactable PII (e.g., apartment numbers, shipping labels, badges):** Renders automatic HTML5 Canvas Gaussian Smart Blur regions with human-in-the-loop toggle pills and **drag-to-draw custom blur boxes** on desktop and touch screens.
+   - **Major Landmarks (e.g., Eiffel Tower, Hollywood Sign, city skylines):** Skips pointless full-photo blurring and instead surfaces **Delayed-Posting Guidance** (*wait 24–72 hours after leaving the area*) alongside **past-tense, time-shifted caption rewrites** that preserve creator voice.
+
+### 4. Personalized Safety Playbook (`Checklist`), Defensive Photo Noise (`Photo Noise`) & Live Zero-Storage Proof (`Zero Storage`)
+- **Personalized Safety Playbook:** Combines triggered scan-specific action items with RAINN-aligned creator safety habits and exports as a local `.md` file.
+- **Photo Noise Studio:** Client-side defensive perturbation preview (`Subtle` and `Cloak` modes with adjustable `5%–100%` strength) for protecting creator portraits before sharing.
+- **Verifiable Zero-Storage Architecture:** Live in-app browser storage inspector proving `0` `localStorage` keys, `0` `sessionStorage` keys, `0` cookies, and `0` database persistence—paired with a 1-tap **`Purge` Panic Wipe** that clears React state and revokes blob URLs immediately.
+- **Mac Studio + Installable Android / iOS PWA:** Runs seamlessly in desktop browsers (with a live `Studio / Mobile` `390×844` viewport preview) and installs to Android Chrome / iOS Safari home screens via Web App Manifest + offline-safe Service Worker.
 
 ---
 
-## What Makes Unseen Different
-
-| Existing Privacy Tools | Unseen |
-| :--- | :--- |
-| Checks account privacy toggles | Reviews what the content itself discloses |
-| Strips photo EXIF metadata | Analyzes visuals, backgrounds, captions, and timing together |
-| Audits one post in isolation | Connects cumulative patterns across platforms |
-| Issues generic security warnings | Recommends concrete, voice-preserving edits before publishing |
-| Built with cybersecurity jargon | Designed as an approachable, visual creator studio |
-
----
-
-## Architecture & Google AI (`Gemini`)
+## System Architecture
 
 ```mermaid
 flowchart LR
-    A["Creator-Owned Posts & Drafts\n(Images · Captions · Timestamps)"] --> B["Stage 1: Gemini Multimodal Scan\nStructured Per-Post Disclosures"]
-    B --> C["Stage 2: Cross-Post Synthesis\nCompound Routine & Live-Location Risks"]
-    C --> D["Responsible AI Guardrails\nAnti-Doxxing & Address Redaction"]
-    D --> E["Stage 3: Creator Fix Studio\nSmart Blur/Crop · Voice-Matched Rewrites"]
+  subgraph Client["Creator Device (Mac Browser / Android & iOS PWA)"]
+    Intake["Intake: Photos, Substack/Blog URL, Drafts"]
+    ExifScan["Local Binary EXIF Scanner & Stripper"]
+    AuditUI["Audit Dashboard & 0-100 Exposure Gauge"]
+    FixStudio["Safe Fix Studio: Smart Blur + Delayed-Post Rewrites"]
+    ZeroStore["Zero-Storage Inspector & 1-Tap Purge"]
+  end
+
+  subgraph Bridge["Platform Bridge"]
+    Adapter["HTTP Platform Adapter (/api/*)"]
+  end
+
+  subgraph Server["Stateless Node + TypeScript Runtime"]
+    Consent["Ownership Consent Gate (HTTP 403)"]
+    Article["Public Article & Embedded Image EXIF Extractor"]
+    Orch["3-Stage Privacy Audit Orchestrator"]
+    AntiDox["Anti-Doxxing Redaction Guardrail"]
+    Sanitizer["Base64-Stripped INFO Logger"]
+  end
+
+  subgraph GoogleAI["Google GenAI SDK (@google/genai)"]
+    Gemini["gemini-3.8-flash (Multimodal + Structured JSON)"]
+  end
+
+  Intake --> ExifScan --> Adapter
+  Adapter --> Consent
+  Consent --> Article --> Orch
+  Orch --> Gemini --> AntiDox --> AuditUI
+  AuditUI --> FixStudio
+  ZeroStore -. "Clears memory & blob URLs" .-> Client
+  Orch -. "Sanitized metadata only" .-> Sanitizer
 ```
 
-- **Multimodal Extraction:** Uses Google Gemini vision + text reasoning to identify sensitive objects, readable documents, and temporal cues with structured outputs.
-- **Cross-Platform Reasoning:** Synthesizes per-post findings across platforms to detect multi-post exposure patterns.
-- **Voice-Preserving Generation:** Suggests natural caption alternatives tailored to a creator's tone rather than generic warnings.
+Detailed module boundaries, data contracts, and observability conventions are documented in [`Design.md`](./Design.md).
 
 ---
 
-## Responsible Design Principles
+## Quickstart & Local Setup
 
-1. **Strictly Self-Auditing:** Designed exclusively for creators reviewing content they own or are authorized to manage—never for surveilling third parties.
-2. **Anti-Doxxing Guardrails:** Unseen explains *categories* of exposure and highlights contributing posts, while strictly refusing to infer or output exact home addresses, coordinates, or movement maps.
-3. **Honest Limitations & Human Oversight:** Rather than promising a misleading "100% Privacy Score," Unseen tracks *addressed exposures*, communicates AI limitations clearly, and keeps creators in full control of every edit.
-4. **Ephemeral by Default:** Content uploaded for auditing is processed ephemerally without persistent cloud tracking of personal media.
+### Prerequisites
+- **Node.js `>= 20`** and `npm`
+- A **Google AI Studio API Key** (`GEMINI_API_KEY`) for live `gemini-3.8-flash` inference *(if omitted, Unseen automatically runs in deterministic offline demo-fallback mode so tests and UI previews always work out of the box)*
+
+### 1. Install Dependencies
+```bash
+npm install
+```
+
+### 2. Configure Environment
+Copy `.env.example` to `.env` and add your Gemini API key:
+```bash
+cp .env.example .env
+```
+```dotenv
+GEMINI_API_KEY=your_gemini_api_key_here
+UNSEEN_GEMINI_MODEL=gemini-3.8-flash
+UNSEEN_LOG_LEVEL=INFO
+UNSEEN_ENABLE_DEMO_FALLBACK=true
+```
+
+### 3. Build & Start the Unified Server (Recommended)
+Builds the TypeScript + Vite production bundle into `dist/` and starts the unified API + static PWA server on **`http://localhost:3001`**:
+```bash
+npm run build
+npm start
+```
+Open **`http://localhost:3001`** in Chrome or Safari. Look for the **`Gemini Live`** badge in the top bar to confirm live `gemini-3.8-flash` connectivity.
+
+*(For hot-reload frontend + backend development, run `npm run dev` to launch Vite on `http://localhost:5173` proxying `/api` to `http://localhost:3001`.)*
+
+### Installing on Android or iOS (PWA)
+1. Expose port `3001` on the same Wi-Fi network or via an HTTPS tunnel (or `adb reverse tcp:3001 tcp:3001` over USB on Android).
+2. Open the URL in **Android Chrome** and tap **Install App / Add to Home Screen** (or **Share -> Add to Home Screen** in iOS Safari).
+
+---
+
+## Automated Testing (`npm test`)
+
+Unseen includes **33 automated unit and integration tests across 6 Vitest suites** verifying guardrails, binary EXIF parsing/stripping, Gemini pipeline fallbacks, landmark non-blur filtering, API routes, and zero-storage sanitization:
+
+```bash
+npm test
+```
+
+| Test Suite | Coverage Highlights |
+| :--- | :--- |
+| `tests/foundation.test.ts` | Centralized config defaults (`gemini-3.8-flash`), recursive base64 payload sanitizer, `INFO` structured logger |
+| `tests/guardrailsAndDataset.test.ts` | Self-audit ownership attestation (`403` without consent), street address / unit / GPS anti-doxxing scrubber, 6-post Maya Lin dataset |
+| `tests/exifScannerAndStripper.test.ts` | Binary JPEG `APP1` TIFF/GPS & PNG `eXIf`/`iTXt` detection without coordinate leakage, plus lossless binary EXIF stripping |
+| `tests/geminiPipelineAndArticle.test.ts` | Deterministic `0–100` scoring engine, Substack/blog HTML + embedded photo EXIF extraction, 3-stage orchestrator, Eiffel Tower landmark no-blur filter |
+| `tests/serverAndPlatform.test.ts` | Live HTTP server routes (`/api/health`, `/api/demo-feed`, `/api/extract-article`, `/api/scan-exif`, `/api/audit`, `/api/fix-post`, `/api/feedback`) |
+| `tests/uiHelpersAndExport.test.ts` | Personalized `.md` checklist exporter, bounding-box coordinate clamping, canvas smart-blur state helpers |
+
+---
+
+## Responsible AI & Safety by Design
+
+1. **Self-Audit Ownership Consent Gate:** Every UI scan and `/api/audit` request requires explicit attestation that the creator owns or has permission to audit the content (`HTTP 403` enforced server-side if absent) so Unseen cannot be misused as a stalking reconnaissance tool.
+2. **Anti-Doxxing Output Scrubbing:** Both system prompts and `antiDoxxingGuardrail.ts` allow citing general neighborhoods and repeated public venues so warnings are actionable, while deterministically redacting exact residential street addresses, apartment/unit numbers, and raw GPS coordinates.
+3. **Human-in-the-Loop Oversight & Honest Limitations:** Every audit displays a plain-language AI limitations banner (*Unseen lowers unintentional oversharing risk; it cannot guarantee 100% safety*), lets creators flag `Accurate` or `Missed Something` anonymously, and gives creators manual control over every blur box and caption edit before export.
+4. **Zero Persistent Storage & Sanitized Logs:** Uploaded photos, drafts, and scan outputs exist strictly in ephemeral memory. Server `INFO` observability logs automatically strip base64 image payloads via `payloadSanitizer.ts`.
+
+---
+
+## Project Structure
+
+```text
+├── Design.md                         # Living architecture & privacy guardrail reference
+├── public/                           # PWA manifest, service worker, icons & demo media
+├── src/
+│   ├── config/appConfig.ts           # Centralized env-backed settings & thresholds
+│   ├── domain/privacyTypes.ts        # Shared TypeScript contracts across client & server
+│   ├── features/
+│   │   ├── article-import/           # Public blog/Substack HTML + image EXIF extractor
+│   │   ├── audit-pipeline/           # End-to-end Stage 1-3 privacy audit orchestrator
+│   │   ├── best-practices/           # Personalized safety playbook & .md exporter
+│   │   ├── caption-rewriter/         # Stage 3 caption rewrites & delayed-posting plans
+│   │   ├── demo-dataset/             # 6-post Maya Lin cross-platform creator feed
+│   │   ├── exif-scanner/             # Binary TIFF/IFD parser, EXIF scanner & lossless stripper
+│   │   ├── feedback/                 # Anonymous accuracy/missed-risk counter store
+│   │   ├── guardrails/               # Ownership attestation & anti-doxxing scrubber
+│   │   ├── image-redactor/           # HTML5 Canvas Gaussian Smart Blur + EXIF scrub
+│   │   ├── post-scan/                # Stage 1 multimodal visual + text + EXIF scanner
+│   │   ├── risk-connector/           # Stage 2 cross-post connector & 0-100 scoring engine
+│   │   └── upload/                   # Camera Roll validation, local EXIF scan & strip
+│   ├── genai/geminiClient.ts         # Official @google/genai SDK wrapper (vertexai: false)
+│   ├── logging/                      # Base64 payload sanitizer & structured INFO logger
+│   ├── platform/                     # Cross-platform UI-to-backend bridge
+│   ├── server/                       # Stateless Node HTTP router & static PWA server
+│   └── ui/                           # Editorial React Studio + Mobile PWA interface
+└── tests/                            # 6 Vitest unit & integration test suites (33 tests)
+```
