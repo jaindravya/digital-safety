@@ -69,5 +69,11 @@ To ship a native **macOS Desktop Studio App** today while keeping a zero-rewrite
 - **Stage 3 (`captionRewriter.ts`):** Produces 3 creator-voice caption rewrites, carries forward visual redaction boxes, and recommends publish timing (`SafePostFixPlan`).
 - **Audit Orchestrator (`privacyAuditOrchestrator.ts`):** Coordinates consent verification, Stage 1, Stage 2, deterministic scoring, and anti-doxxing output scrubbing.
 
-### 3.9 Unified Android Mobile PWA & Mac Studio App (`server/` & `src/ui/`) — *Planned (Chunks 4–6)*
-- Single-port Node/Express server + installable Android/iOS Progressive Web App & Mac Studio view with Camera Roll upload, Article URL import, connected risk cards, interactive Smart Blur/Crop canvas, Before/After preview, downloadable Best Practices checklist, and live Audit Log inspector.
+### 3.9 Unified Single-Port API Server, Feedback Store & Android PWA Shell (`src/server/`, `src/platform/`, `public/`) — *Implemented*
+- **Anonymous Accuracy Feedback (`src/features/feedback/accuracyFeedbackStore.ts`):** Records privacy-safe `thumbs_up` / `thumbs_down` ratings and sanitized notes with zero PII.
+- **Unified HTTP Server (`src/server/`):** Serves `/api/health`, `/api/demo-feed`, `/api/import-article`, `/api/audit`, `/api/fix-post`, `/api/feedback`, `/api/logs`, and static/SPA assets on a single port (`3001`) with path-traversal protection (`resolveSafeStaticFile`) and `35MB` JSON body cap for high-res camera-roll batches.
+- **Platform Bridge (`src/platform/platformBridge.ts` & `httpPlatformAdapter.ts`):** Decouples React screens from transport details so the UI stays portable across Android PWA, Mac browsers, and future native shells.
+- **Installable Android & iOS PWA (`public/manifest.webmanifest`, `public/sw.js`, `public/icons/`):** Enables native "Install App" on Android Chrome with custom `192×192` and `512×512` icons while intentionally never caching sensitive `/api/*` payloads.
+
+### 3.10 Retro + Robinhood Creator Studio & Mobile UI (`src/ui/`) — *Planned (Chunks 5–6)*
+- Consent Gate, Camera Roll uploader, Blog/Substack URL importer, `0–100` Exposure Gauge, `"With X% confidence..."` cross-platform cards, interactive Smart Blur/Crop canvas, Voice-Preserving Caption Studio, Before/After preview, downloadable Best Practices checklist, and live `INFO` Audit Log inspector.

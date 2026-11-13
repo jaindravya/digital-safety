@@ -84,6 +84,12 @@ export interface UnseenConfig {
     readonly mobileCompanionWidth: number;
     readonly mobileCompanionHeight: number;
   };
+  readonly server: {
+    readonly defaultPort: number;
+    readonly uiDevPort: number;
+    readonly bindHost: string;
+    readonly maxJsonBodyBytes: number;
+  };
 }
 
 /**
@@ -108,12 +114,8 @@ export function readEnvVariable(key: string): string | undefined {
  * @returns Frozen `UnseenConfig` instance used across all modules.
  */
 export function createAppConfig(): UnseenConfig {
-  const modelOverride =
-    readEnvVariable('UNSEEN_GEMINI_MODEL') ??
-    readEnvVariable('PRIVACY_MIRROR_GEMINI_MODEL');
-  const fallbackFlag =
-    readEnvVariable('UNSEEN_ENABLE_DEMO_FALLBACK') ??
-    readEnvVariable('PRIVACY_MIRROR_ENABLE_DEMO_FALLBACK');
+  const modelOverride = readEnvVariable('UNSEEN_GEMINI_MODEL');
+  const fallbackFlag = readEnvVariable('UNSEEN_ENABLE_DEMO_FALLBACK');
   const defaultModel = modelOverride ?? 'gemini-2.5-flash';
 
   return Object.freeze({
@@ -168,6 +170,12 @@ export function createAppConfig(): UnseenConfig {
       macWindowHeight: 860,
       mobileCompanionWidth: 390,
       mobileCompanionHeight: 844,
+    }),
+    server: Object.freeze({
+      defaultPort: Number(readEnvVariable('PORT') ?? '3001'),
+      uiDevPort: 5173,
+      bindHost: '0.0.0.0',
+      maxJsonBodyBytes: 35 * 1024 * 1024,
     }),
   });
 }

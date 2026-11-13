@@ -5,16 +5,30 @@
   "description": "Unseen: AI-powered cross-platform digital safety assistant for women creators",
   "type": "module",
   "scripts": {
+    "dev:api": "tsx src/server/startServer.ts",
+    "dev:ui": "vite",
+    "dev": "concurrently -k \"npm:dev:api\" \"npm:dev:ui\"",
+    "build": "tsc --noEmit && vite build",
+    "start": "tsx src/server/startServer.ts",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest"
   },
   "dependencies": {
-    "@google/genai": "^1.0.0"
+    "@google/genai": "^1.0.0",
+    "lucide-react": "^0.475.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
   },
   "devDependencies": {
     "@types/node": "^22.10.0",
+    "@types/react": "^19.0.8",
+    "@types/react-dom": "^19.0.3",
+    "@vitejs/plugin-react": "^4.3.4",
+    "concurrently": "^9.1.2",
+    "tsx": "^4.19.2",
     "typescript": "^5.7.2",
+    "vite": "^6.1.0",
     "vitest": "^3.0.5"
   }
 }
