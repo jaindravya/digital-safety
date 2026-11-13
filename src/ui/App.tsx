@@ -10,7 +10,8 @@
  *   - **Tab 2 (`report`):** Curved Semi-Circular Exposure Index + `"With X% confidence..."`
  *     cross-platform cards + anonymous accuracy feedback.
  *   - **Tab 3 (`practices`):** Personalized & baseline safety playbook + local export.
- *   - **Tab 4 (`story`):** Live Zero-Storage Browser Proof + Counter-OSINT brief.
+ *   - **Tab 4 (`noise`):** Photo upload + defensive noise preview UI (pluggable
+ *     placeholder for future backend perturbation endpoint).
  *   - **Modal (`SafeFixStudioModal`):** Smart Blur/Crop canvas + Gemini Stage 3
  *     voice-preserving caption rewrites + Before/After comparison.
  *   - **Header Controls:** Engine readiness badge, `Studio View / Phone View` frame
@@ -54,16 +55,16 @@ import { BestPracticesView } from './components/BestPracticesView';
 import { ContentIntakeView } from './components/ContentIntakeView';
 import { RiskReportView } from './components/RiskReportView';
 import { SafeFixStudioModal } from './components/SafeFixStudioModal';
-import { ZeroStorageStoryView } from './components/ZeroStorageStoryView';
+import { PhotoNoiseView } from './components/PhotoNoiseView';
 import './styles/unseenTheme.css';
 
-type ActiveTab = 'intake' | 'report' | 'practices' | 'story';
+type ActiveTab = 'intake' | 'report' | 'practices' | 'noise';
 
 const TAB_SUBTITLES: Record<ActiveTab, string> = {
   intake: 'Content Intake',
   report: 'Privacy Diagnostic',
   practices: 'Safety Playbook',
-  story: 'Zero-Storage Proof',
+  noise: 'Photo Noise Shield',
 };
 
 /**
@@ -314,22 +315,13 @@ export function App(): React.ReactElement {
             onClick={() => setActiveTab('intake')}
           >
             <div className="unseen-logo-mark" aria-hidden="true">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-                <path
-                  d="M2.5 12C5 7.5 8.5 5.5 12 5.5C15.5 5.5 19 7.5 21.5 12C19 16.5 15.5 18.5 12 18.5C8.5 18.5 5 16.5 2.5 12Z"
-                  stroke="#E9B8D7"
-                  strokeWidth="1.9"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-                <circle cx="12" cy="12" r="3" fill="#FAF7F5" />
-                <path
-                  d="M4 20L20 4"
-                  stroke="#FF6B6B"
-                  strokeWidth="1.9"
-                  strokeLinecap="round"
-                />
-              </svg>
+              <img
+                src="/icons/icon-192.png"
+                alt=""
+                width={32}
+                height={32}
+                className="unseen-logo-img"
+              />
             </div>
             <div>
               <div className="unseen-brand-row">
@@ -368,11 +360,11 @@ export function App(): React.ReactElement {
             </button>
             <button
               type="button"
-              aria-current={activeTab === 'story' ? 'page' : undefined}
-              className={`unseen-nav-link ${activeTab === 'story' ? 'active' : ''}`}
-              onClick={() => setActiveTab('story')}
+              aria-current={activeTab === 'noise' ? 'page' : undefined}
+              className={`unseen-nav-link ${activeTab === 'noise' ? 'active' : ''}`}
+              onClick={() => setActiveTab('noise')}
             >
-              Zero Storage
+              Photo Noise
             </button>
           </nav>
 
@@ -425,8 +417,8 @@ export function App(): React.ReactElement {
 
             <button
               type="button"
-              onClick={() => setActiveTab('story')}
-              aria-label="View zero-storage privacy verification"
+              onClick={() => setActiveTab('noise')}
+              aria-label="Open Photo Noise Shield"
               className="unseen-shield-circle-btn"
             >
               <ShieldCheck size={16} aria-hidden="true" />
@@ -521,14 +513,8 @@ export function App(): React.ReactElement {
           />
         )}
 
-        {activeTab === 'story' && (
-          <ZeroStorageStoryView
-            stagedItemCount={posts.length}
-            hasAuditReport={Boolean(report)}
-            onGoToIntake={() => setActiveTab('intake')}
-            onGoToReport={() => report && setActiveTab('report')}
-            onPurgeSession={handlePurgeSession}
-          />
+        {activeTab === 'noise' && (
+          <PhotoNoiseView onNotify={setToastMessage} />
         )}
       </main>
 
@@ -564,12 +550,12 @@ export function App(): React.ReactElement {
         </button>
         <button
           type="button"
-          aria-current={activeTab === 'story' ? 'page' : undefined}
-          className={`unseen-mobile-tab-btn ${activeTab === 'story' ? 'active' : ''}`}
-          onClick={() => setActiveTab('story')}
+          aria-current={activeTab === 'noise' ? 'page' : undefined}
+          className={`unseen-mobile-tab-btn ${activeTab === 'noise' ? 'active' : ''}`}
+          onClick={() => setActiveTab('noise')}
         >
           <Sparkles size={18} aria-hidden="true" />
-          <span>Proof</span>
+          <span>Noise</span>
         </button>
       </nav>
 
