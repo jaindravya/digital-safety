@@ -5,24 +5,30 @@
  * loading of the 6-post sample creator feed.
  *
  * Feature Overview:
- * Gives creators and hackathon judges three frictionless ways to populate an audit:
- *   1. Pick original photos directly from the Android Gallery / Mac Finder (`<= 20MB`,
- *      photos in MVP, clear V1 message on videos) and attach optional captions/draft toggles.
- *   2. Paste any public Substack or blog post link to extract written routine/location prose.
- *   3. Load the 6-post cross-platform sample feed ("Maya Lin") in one tap for instant stage demos.
+ * Pairs Unseen's dark-plum editorial framing with a warm-cream diagnostic intake
+ * card, monochrome mode toggle (`Photos` | `Article URL` | `Draft Text`),
+ * self-audit ownership consent gate, and staged content gallery before launching
+ * the Gemini multimodal audit.
  *
  * Primary Use Cases:
- * 1. Uploading real phone photos + pasting a blog URL on Android or Mac.
- * 2. Editing captions or toggling `Unpublished Draft` status before clicking Scan.
+ * 1. Uploading original phone/Mac photos + pasting a blog URL on Android, iOS, or Mac.
+ * 2. Editing captions or staging unpublished drafts before clicking Audit.
  */
 
 import {
+  AlertTriangle,
   Camera,
+  ChevronDown,
+  ChevronUp,
   FileText,
   Globe,
+  Lock,
+  RefreshCw,
+  ShieldCheck,
   Sparkles,
   Trash2,
   Upload,
+  Zap,
 } from 'lucide-react';
 import React, { useRef, useState } from 'react';
 import { CreatorPost } from '../../domain/privacyTypes';
@@ -41,6 +47,7 @@ export interface ContentIntakeViewProps {
   readonly attestation: OwnershipAttestation;
   readonly isScanning: boolean;
   readonly isImportingArticle: boolean;
+  readonly engineModelLabel?: string;
   readonly onToggleAttestation: (accepted: boolean) => void;
   readonly onAddPosts: (newPosts: readonly CreatorPost[]) => void;
   readonly onUpdatePostCaption: (postId: string, caption: string) => void;
@@ -50,8 +57,10 @@ export interface ContentIntakeViewProps {
   readonly onRunAudit: () => Promise<void>;
 }
 
+type IntakeMode = 'photos' | 'article' | 'draft';
+
 /**
- * Renders the Consent Gate, Camera Roll uploader, Blog URL importer, and staged post grid.
+ * Renders the hero framing, intake hub card, Consent Gate, and staged post grid.
  *
  * @param props - State and action callbacks for staging content and launching the Gemini scan.
  * @returns Step 1 intake view element.
@@ -60,14 +69,15 @@ export function ContentIntakeView(
   props: ContentIntakeViewProps,
 ): React.ReactElement {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const [intakeMode, setIntakeMode] = useState<IntakeMode>('photos');
+  const [showCameraRollInfo, setShowCameraRollInfo] = useState(false);
   const [articleUrl, setArticleUrl] = useState('');
   const [manualNoteTitle, setManualNoteTitle] = useState('');
   const [manualNoteBody, setManualNoteBody] = useState('');
-  const [showManualArticleBox, setShowManualArticleBox] = useState(false);
   const [localError, setLocalError] = useState<string | null>(null);
 
   /**
-   * Processes files selected from the Android Gallery or Mac file picker.
+   * Processes files selected from the Android Gallery, iOS library, or Mac file picker.
    *
    * @param event - File input change event.
    */
@@ -92,12 +102,15 @@ export function ContentIntakeView(
         const post = await readCameraRollFileToPost(file, i);
         added.push(post);
       } catch (err) {
-        setLocalError(err instanceof Error ? err.message : 'Photo upload failed.');
+        setLocalError(
+          err instanceof Error ? err.message : 'Photo upload failed.',
+        );
       }
     }
 
     if (added.length > 0) {
       props.onAddPosts(added);
+      setShowCameraRollInfo(true);
     }
     event.target.value = '';
   }
@@ -149,299 +162,592 @@ export function ContentIntakeView(
     ]);
     setManualNoteTitle('');
     setManualNoteBody('');
-    setShowManualArticleBox(false);
   }
 
   return (
-    <div>
-      <div style={{ marginBottom: '20px' }}>
-        <h1 className="unseen-serif-h1">
-          See what your posts reveal together—before anyone else can.
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+      {/* Editorial Hero Framing */}
+      <section className="unseen-hero" style={{ marginBottom: 0 }}>
+        <h1 className="unseen-hero-title">
+          Audit your digital footprint without giving up your privacy.
         </h1>
-        <p
-          style={{
-            margin: 0,
-            color: 'var(--ink-secondary)',
-            fontSize: '0.98rem',
-            maxWidth: '720px',
-            lineHeight: 1.5,
-          }}
-        >
-          Upload original photos from your camera roll and add a blog or
-          Substack link. Gemini connects subtle visual, caption, and schedule
-          clues across your content and helps you fix risks before publishing.
+        <p className="unseen-hero-sub">
+          Safe in plain sight. Unseen by design. Zero accounts, zero cookies,
+          zero saved photos.
         </p>
-      </div>
+      </section>
 
-      <ConsentBannerCard
-        attestation={props.attestation}
-        onToggleAttestation={props.onToggleAttestation}
-      />
-
-      {localError && (
-        <div
-          role="alert"
-          className="unseen-card"
-          style={{
-            background: 'var(--status-high-bg)',
-            borderColor: '#f3b8b3',
-            color: 'var(--status-high-ink)',
-            padding: '14px 18px',
-            fontWeight: 600,
-            fontSize: '0.88rem',
-          }}
-        >
-          {localError}
-        </div>
-      )}
-
-      <div className="unseen-intake-grid">
-        {/* Card 1: Original Camera Roll Upload */}
-        <div className="unseen-card" style={{ marginBottom: 0 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '9px', marginBottom: '8px' }}>
-            <Camera size={20} color="var(--accent-forest)" />
-            <h2 className="unseen-serif-h2" style={{ fontSize: '1.15rem', margin: 0 }}>
-              1. Camera Roll Photos
-            </h2>
-          </div>
-          <p style={{ fontSize: '0.85rem', color: 'var(--ink-secondary)', margin: '0 0 14px' }}>
-            Select original photos or unpublished drafts from your phone gallery
-            or Mac (`JPG`, `PNG`, `WebP` up to 20MB · video scanning coming in V1).
-          </p>
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/jpeg,image/png,image/webp,image/heic"
-            multiple
-            onChange={handleFilesSelected}
-            style={{ display: 'none' }}
-          />
-          <button
-            type="button"
-            className="unseen-btn unseen-btn-secondary"
-            style={{ width: '100%' }}
-            onClick={() => fileInputRef.current?.click()}
+      <div className="unseen-split-grid">
+        {/* Left Column: Intake Control Card */}
+        <div className="unseen-col-stack">
+          <section
+            className="unseen-cream-card"
+            aria-label="Content Intake Controls"
+            style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}
           >
-            <Upload size={17} />
-            Choose Photos from Camera Roll
-          </button>
-        </div>
-
-        {/* Card 2: Blog / Substack Article URL */}
-        <div className="unseen-card" style={{ marginBottom: 0 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '9px', marginBottom: '8px' }}>
-            <Globe size={20} color="var(--accent-coral)" />
-            <h2 className="unseen-serif-h2" style={{ fontSize: '1.15rem', margin: 0 }}>
-              2. Blog or Substack Link
-            </h2>
-          </div>
-          <p style={{ fontSize: '0.85rem', color: 'var(--ink-secondary)', margin: '0 0 12px' }}>
-            Paste a public newsletter or blog article URL so Unseen can check if
-            written routines connect with your photos.
-          </p>
-          <form onSubmit={handleArticleSubmit} style={{ display: 'flex', gap: '8px' }}>
-            <input
-              type="url"
-              className="unseen-input"
-              placeholder="https://yourname.substack.com/p/..."
-              value={articleUrl}
-              onChange={(e) => setArticleUrl(e.target.value)}
-              aria-label="Public blog or Substack article URL"
-            />
-            <button
-              type="submit"
-              className="unseen-btn unseen-btn-secondary"
-              disabled={props.isImportingArticle || !articleUrl.trim()}
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: '8px',
+                flexWrap: 'wrap',
+              }}
             >
-              {props.isImportingArticle ? 'Reading…' : 'Add'}
-            </button>
-          </form>
-          <button
-            type="button"
-            onClick={() => setShowManualArticleBox((v) => !v)}
-            style={{
-              background: 'none',
-              border: 'none',
-              padding: '8px 0 0',
-              fontSize: '0.78rem',
-              color: 'var(--ink-secondary)',
-              textDecoration: 'underline',
-              cursor: 'pointer',
-            }}
-          >
-            {showManualArticleBox ? 'Hide draft text box' : 'Or paste unpublished blog draft text'}
-          </button>
-
-          {showManualArticleBox && (
-            <div style={{ marginTop: '10px', display: 'grid', gap: '8px' }}>
-              <input
-                type="text"
-                className="unseen-input"
-                placeholder="Article title (optional)"
-                value={manualNoteTitle}
-                onChange={(e) => setManualNoteTitle(e.target.value)}
-              />
-              <textarea
-                rows={3}
-                className="unseen-textarea"
-                placeholder="Paste newsletter or blog paragraph..."
-                value={manualNoteBody}
-                onChange={(e) => setManualNoteBody(e.target.value)}
-              />
-              <button
-                type="button"
-                className="unseen-btn unseen-btn-secondary unseen-btn-sm"
-                onClick={handleAddPastedArticleExcerpt}
+              <span className="unseen-card-label">Content Intake</span>
+              <span
+                className="unseen-pill platform"
+                style={{
+                  borderRadius: '6px',
+                  fontSize: '0.72rem',
+                  fontWeight: 700,
+                }}
               >
-                Add Written Draft
-              </button>
+                <Zap size={12} color="#059669" aria-hidden="true" />
+                {props.engineModelLabel
+                  ? `${props.engineModelLabel} Ready`
+                  : 'Gemini Vision Ready'}
+              </span>
             </div>
-          )}
-        </div>
-      </div>
 
-      {/* Quick Demo Bar + Run Scan CTA */}
-      <div
-        className="unseen-card"
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          flexWrap: 'wrap',
-          gap: '12px',
-          background: 'var(--bg-subtle)',
-        }}
-      >
-        <div>
-          <strong style={{ fontSize: '0.94rem' }}>
-            {props.posts.length === 0
-              ? 'Want to try a live cross-platform creator story first?'
-              : `${props.posts.length} item${props.posts.length === 1 ? '' : 's'} staged for cross-content privacy scan`}
-          </strong>
-          {props.persona && (
-            <div style={{ fontSize: '0.8rem', color: 'var(--ink-secondary)', marginTop: '2px' }}>
-              Demo Persona: <strong>{props.persona.displayName}</strong> ({props.persona.handle}) — {props.persona.bio}
+            {/* Monochrome Black-and-White Mode Toggle */}
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: '10px',
+                padding: '10px 0',
+                borderTop: '1px solid var(--card-border)',
+                borderBottom: '1px solid var(--card-border)',
+                flexWrap: 'wrap',
+              }}
+            >
+              <span
+                style={{
+                  fontSize: '0.78rem',
+                  fontWeight: 700,
+                  color: 'var(--card-ink)',
+                }}
+              >
+                Source Type
+              </span>
+
+              <div
+                role="tablist"
+                aria-label="Content source mode"
+                className="unseen-mono-track"
+              >
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={intakeMode === 'photos'}
+                  onClick={() => setIntakeMode('photos')}
+                  className={`unseen-mono-option ${
+                    intakeMode === 'photos' ? 'active' : ''
+                  }`}
+                >
+                  Photos
+                </button>
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={intakeMode === 'article'}
+                  onClick={() => setIntakeMode('article')}
+                  className={`unseen-mono-option ${
+                    intakeMode === 'article' ? 'active' : ''
+                  }`}
+                >
+                  Article URL
+                </button>
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={intakeMode === 'draft'}
+                  onClick={() => setIntakeMode('draft')}
+                  className={`unseen-mono-option ${
+                    intakeMode === 'draft' ? 'active' : ''
+                  }`}
+                >
+                  Draft Text
+                </button>
+              </div>
             </div>
-          )}
-        </div>
 
-        <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
-          <button
-            type="button"
-            className="unseen-btn unseen-btn-secondary"
-            onClick={props.onLoadSampleFeed}
-          >
-            Load Sample Creator Feed (6)
-          </button>
+            {/* Active Input Mode Panel */}
+            {intakeMode === 'photos' && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp,image/heic"
+                  multiple
+                  onChange={handleFilesSelected}
+                  style={{ display: 'none' }}
+                />
 
-          <button
-            type="button"
-            className="unseen-btn unseen-btn-primary"
-            disabled={
-              props.posts.length === 0 ||
-              !props.attestation.attestedByCreator ||
-              props.isScanning
-            }
-            onClick={props.onRunAudit}
-          >
-            <Sparkles size={17} />
-            {props.isScanning
-              ? 'Scanning Multimodal Patterns…'
-              : `Run Gemini Privacy Audit (${props.posts.length})`}
-          </button>
-        </div>
-      </div>
+                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                  <button
+                    type="button"
+                    className="unseen-btn unseen-btn-sand"
+                    style={{ flex: 1, minHeight: '42px', fontSize: '0.78rem' }}
+                    onClick={() => fileInputRef.current?.click()}
+                  >
+                    <Upload size={15} aria-hidden="true" />
+                    <span>Upload Photos from Camera Roll</span>
+                  </button>
+                  <button
+                    type="button"
+                    aria-label="Toggle camera roll technical details"
+                    aria-expanded={showCameraRollInfo}
+                    onClick={() => setShowCameraRollInfo((prev) => !prev)}
+                    className="unseen-btn unseen-btn-sand"
+                    style={{
+                      minHeight: '42px',
+                      width: '42px',
+                      padding: 0,
+                      borderRadius: '12px',
+                      flexShrink: 0,
+                    }}
+                  >
+                    {showCameraRollInfo ? (
+                      <ChevronUp size={16} />
+                    ) : (
+                      <ChevronDown size={16} />
+                    )}
+                  </button>
+                </div>
 
-      {/* Staged Content Grid */}
-      {props.posts.length > 0 && (
-        <section aria-label="Staged Creator Content">
-          <h2 className="unseen-serif-h2" style={{ marginBottom: '12px' }}>
-            Staged Photos, Articles & Drafts ({props.posts.length})
-          </h2>
-          <div className="unseen-post-grid">
-            {props.posts.map((post) => {
-              const previewSrc = post.imageDataUrl ?? post.mediaAssetPath;
-              return (
-                <article key={post.id} className="unseen-post-card">
-                  {previewSrc ? (
-                    <img
-                      src={previewSrc}
-                      alt={post.mediaAltDescription}
-                      className="unseen-post-thumb"
-                    />
-                  ) : (
+                {showCameraRollInfo && (
+                  <div
+                    className="unseen-white-tile"
+                    style={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '4px',
+                    }}
+                  >
                     <div
-                      className="unseen-post-thumb"
                       style={{
                         display: 'flex',
-                        flexDirection: 'column',
                         alignItems: 'center',
-                        justifyContent: 'center',
-                        padding: '18px',
-                        textAlign: 'center',
-                        color: 'var(--ink-secondary)',
+                        gap: '7px',
+                        fontSize: '0.76rem',
+                        fontWeight: 700,
+                        color: 'var(--card-ink)',
                       }}
                     >
-                      <FileText size={28} />
-                      <span style={{ fontSize: '0.8rem', marginTop: '6px', fontWeight: 600 }}>
-                        Imported Written Article
+                      <Camera size={15} color="#059669" aria-hidden="true" />
+                      <span>
+                        Supports JPG, PNG, and WebP originals up to 20MB
                       </span>
                     </div>
-                  )}
+                    <p
+                      style={{
+                        margin: 0,
+                        fontSize: '0.74rem',
+                        color: 'var(--card-ink-muted)',
+                        lineHeight: 1.45,
+                      }}
+                    >
+                      Original camera-roll photos let Gemini inspect subtle
+                      background labels, reflections, and location cues (video
+                      scanning coming in V1).
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
 
-                  <div style={{ padding: '14px', display: 'flex', flexDirection: 'column', gap: '8px', flex: 1 }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '6px' }}>
-                      <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-                        <span className="unseen-pill platform">
-                          {post.platform.replace('_', ' ')}
-                        </span>
-                        {post.isDraft && (
-                          <span className="unseen-pill medium">Draft</span>
-                        )}
-                      </div>
-                      <button
-                        type="button"
-                        aria-label={`Remove ${post.title ?? post.id}`}
-                        onClick={() => props.onRemovePost(post.id)}
+            {intakeMode === 'article' && (
+              <form
+                onSubmit={handleArticleSubmit}
+                style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}
+              >
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    fontSize: '0.76rem',
+                    fontWeight: 700,
+                    color: 'var(--card-ink-secondary)',
+                  }}
+                >
+                  <Globe size={14} color="#c53030" aria-hidden="true" />
+                  <span>Public Substack or Blog Post Link</span>
+                </div>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <input
+                    type="url"
+                    className="unseen-input"
+                    placeholder="https://yourname.substack.com/p/..."
+                    value={articleUrl}
+                    onChange={(e) => setArticleUrl(e.target.value)}
+                    aria-label="Public blog or Substack article URL"
+                  />
+                  <button
+                    type="submit"
+                    className="unseen-btn unseen-btn-sand"
+                    style={{ minHeight: '42px', padding: '0 16px' }}
+                    disabled={props.isImportingArticle || !articleUrl.trim()}
+                  >
+                    {props.isImportingArticle ? 'Reading…' : 'Add'}
+                  </button>
+                </div>
+              </form>
+            )}
+
+            {intakeMode === 'draft' && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <input
+                  type="text"
+                  className="unseen-input"
+                  placeholder="Draft title (optional)"
+                  value={manualNoteTitle}
+                  onChange={(e) => setManualNoteTitle(e.target.value)}
+                />
+                <textarea
+                  rows={3}
+                  className="unseen-textarea"
+                  placeholder="Paste unpublished newsletter, caption, or blog paragraph..."
+                  value={manualNoteBody}
+                  onChange={(e) => setManualNoteBody(e.target.value)}
+                />
+                <button
+                  type="button"
+                  className="unseen-btn unseen-btn-sand unseen-btn-sm"
+                  disabled={!manualNoteBody.trim()}
+                  onClick={handleAddPastedArticleExcerpt}
+                >
+                  Add Written Draft to Queue
+                </button>
+              </div>
+            )}
+
+            {/* Primary Action CTAs */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <button
+                type="button"
+                className="unseen-btn unseen-btn-dark unseen-btn-full"
+                style={{ minHeight: '48px' }}
+                disabled={
+                  props.posts.length === 0 ||
+                  !props.attestation.attestedByCreator ||
+                  props.isScanning
+                }
+                onClick={props.onRunAudit}
+              >
+                {props.isScanning ? (
+                  <>
+                    <RefreshCw size={16} className="unseen-spin" aria-hidden="true" />
+                    <span>Analyzing visual & routine patterns…</span>
+                  </>
+                ) : (
+                  <>
+                    <Lock size={16} aria-hidden="true" />
+                    <span>
+                      Run Gemini Privacy Audit ({props.posts.length})
+                    </span>
+                  </>
+                )}
+              </button>
+
+              <button
+                type="button"
+                className="unseen-btn unseen-btn-sand unseen-btn-full"
+                style={{ minHeight: '42px', fontSize: '0.8rem' }}
+                onClick={props.onLoadSampleFeed}
+              >
+                <Sparkles size={15} aria-hidden="true" />
+                <span>Load Sample Creator Feed (6)</span>
+              </button>
+            </div>
+
+            {!props.attestation.attestedByCreator && props.posts.length > 0 && (
+              <p
+                style={{
+                  margin: 0,
+                  fontSize: '0.75rem',
+                  fontWeight: 600,
+                  color: 'var(--status-high-ink)',
+                  textAlign: 'center',
+                }}
+              >
+                Confirm the Self-Audit Ownership check on the right to unlock
+                scanning.
+              </p>
+            )}
+
+            {/* Ephemeral Guarantee Banner */}
+            <div
+              className="unseen-well"
+              style={{
+                display: 'flex',
+                alignItems: 'flex-start',
+                gap: '10px',
+              }}
+            >
+              <ShieldCheck
+                size={16}
+                color="var(--card-ink)"
+                style={{ flexShrink: 0, marginTop: '2px' }}
+                aria-hidden="true"
+              />
+              <p
+                style={{
+                  margin: 0,
+                  fontSize: '0.75rem',
+                  color: 'var(--card-ink-secondary)',
+                  lineHeight: 1.45,
+                }}
+              >
+                <strong style={{ color: 'var(--card-ink)' }}>
+                  100% Private &amp; Safe:
+                </strong>{' '}
+                No password needed. Your photos are never saved and stay strictly
+                in session RAM.
+              </p>
+            </div>
+          </section>
+        </div>
+
+        {/* Right Column: Consent Gate + Staged Content Gallery */}
+        <div className="unseen-col-stack">
+          <ConsentBannerCard
+            attestation={props.attestation}
+            onToggleAttestation={props.onToggleAttestation}
+          />
+
+          {localError && (
+            <div
+              role="alert"
+              className="unseen-cream-card compact"
+              style={{
+                background: 'var(--status-high-bg)',
+                borderColor: 'var(--status-high-border)',
+                color: 'var(--status-high-ink)',
+                display: 'flex',
+                alignItems: 'flex-start',
+                gap: '10px',
+                fontSize: '0.82rem',
+                fontWeight: 600,
+              }}
+            >
+              <AlertTriangle
+                size={16}
+                style={{ flexShrink: 0, marginTop: '2px' }}
+                aria-hidden="true"
+              />
+              <span>{localError}</span>
+            </div>
+          )}
+
+          {props.persona && (
+            <div
+              className="unseen-cream-card compact"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: '12px',
+                flexWrap: 'wrap',
+              }}
+            >
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontSize: '0.82rem', fontWeight: 800 }}>
+                  Demo Persona: {props.persona.displayName}{' '}
+                  <span
+                    className="unseen-mono-num"
+                    style={{ color: 'var(--card-plum)' }}
+                  >
+                    ({props.persona.handle})
+                  </span>
+                </div>
+                <div
+                  style={{
+                    fontSize: '0.76rem',
+                    color: 'var(--card-ink-muted)',
+                    marginTop: '2px',
+                  }}
+                >
+                  {props.persona.bio}
+                </div>
+              </div>
+              <span className="unseen-pill platform">Sample Feed Loaded</span>
+            </div>
+          )}
+
+          {props.posts.length > 0 ? (
+            <section
+              aria-label="Staged Creator Content"
+              style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}
+            >
+              <div className="unseen-section-head">
+                <h2 className="unseen-section-title">
+                  Staged Photos, Articles &amp; Drafts
+                </h2>
+                <span className="unseen-pill cream unseen-mono-num">
+                  {props.posts.length} Staged
+                </span>
+              </div>
+
+              <div className="unseen-post-grid">
+                {props.posts.map((post) => {
+                  const previewSrc = post.imageDataUrl ?? post.mediaAssetPath;
+                  return (
+                    <article key={post.id} className="unseen-post-card">
+                      {previewSrc ? (
+                        <img
+                          src={previewSrc}
+                          alt={post.mediaAltDescription}
+                          className="unseen-post-thumb"
+                        />
+                      ) : (
+                        <div
+                          className="unseen-post-thumb"
+                          style={{
+                            display: 'flex',
+                            flexDirection: 'column',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            padding: '18px',
+                            textAlign: 'center',
+                            background: 'var(--card-well)',
+                            color: 'var(--card-ink-secondary)',
+                          }}
+                        >
+                          <FileText size={26} aria-hidden="true" />
+                          <span
+                            style={{
+                              fontSize: '0.78rem',
+                              marginTop: '6px',
+                              fontWeight: 700,
+                            }}
+                          >
+                            Imported Written Article
+                          </span>
+                        </div>
+                      )}
+
+                      <div
                         style={{
-                          background: 'none',
-                          border: 'none',
-                          cursor: 'pointer',
-                          color: 'var(--ink-muted)',
-                          padding: '4px',
+                          padding: '14px',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '8px',
+                          flex: 1,
                         }}
                       >
-                        <Trash2 size={15} />
-                      </button>
-                    </div>
+                        <div
+                          style={{
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                            gap: '6px',
+                          }}
+                        >
+                          <div
+                            style={{
+                              display: 'flex',
+                              gap: '6px',
+                              flexWrap: 'wrap',
+                            }}
+                          >
+                            <span className="unseen-pill platform">
+                              {post.platform.replace('_', ' ')}
+                            </span>
+                            {post.isDraft && (
+                              <span className="unseen-pill medium">Draft</span>
+                            )}
+                          </div>
+                          <button
+                            type="button"
+                            aria-label={`Remove ${post.title ?? post.id}`}
+                            onClick={() => props.onRemovePost(post.id)}
+                            style={{
+                              background: 'transparent',
+                              border: 'none',
+                              cursor: 'pointer',
+                              color: 'var(--card-ink-subtle)',
+                              padding: '4px',
+                              borderRadius: '8px',
+                            }}
+                          >
+                            <Trash2 size={15} aria-hidden="true" />
+                          </button>
+                        </div>
 
-                    {post.title && (
-                      <div style={{ fontWeight: 700, fontSize: '0.9rem' }}>
-                        {post.title}
+                        {post.title && (
+                          <div
+                            style={{
+                              fontWeight: 800,
+                              fontSize: '0.86rem',
+                              color: 'var(--card-ink)',
+                              lineHeight: 1.3,
+                            }}
+                          >
+                            {post.title}
+                          </div>
+                        )}
+                        <div
+                          style={{
+                            fontSize: '0.72rem',
+                            color: 'var(--card-ink-subtle)',
+                          }}
+                        >
+                          {post.postedAtLabel}
+                        </div>
+
+                        <textarea
+                          rows={3}
+                          className="unseen-textarea"
+                          style={{ fontSize: '0.78rem', marginTop: 'auto' }}
+                          placeholder="Add caption, timing note, or excerpt..."
+                          value={post.caption}
+                          onChange={(e) =>
+                            props.onUpdatePostCaption(post.id, e.target.value)
+                          }
+                          aria-label={`Caption or excerpt for ${
+                            post.title ?? post.id
+                          }`}
+                        />
                       </div>
-                    )}
-                    <div style={{ fontSize: '0.75rem', color: 'var(--ink-muted)' }}>
-                      {post.postedAtLabel}
-                    </div>
-
-                    <textarea
-                      rows={3}
-                      className="unseen-textarea"
-                      style={{ fontSize: '0.82rem', marginTop: 'auto' }}
-                      placeholder="Add caption, timing note, or excerpt..."
-                      value={post.caption}
-                      onChange={(e) =>
-                        props.onUpdatePostCaption(post.id, e.target.value)
-                      }
-                      aria-label={`Caption or excerpt for ${post.title ?? post.id}`}
-                    />
-                  </div>
-                </article>
-              );
-            })}
-          </div>
-        </section>
-      )}
+                    </article>
+                  );
+                })}
+              </div>
+            </section>
+          ) : (
+            <section
+              className="unseen-cream-card"
+              style={{
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '10px',
+              }}
+            >
+              <span className="unseen-card-label">In-RAM Staging Queue</span>
+              <h2 className="unseen-card-title">
+                Stage photos, blog links, or Maya&apos;s 6-post creator feed
+              </h2>
+              <p
+                style={{
+                  margin: 0,
+                  fontSize: '0.82rem',
+                  color: 'var(--card-ink-muted)',
+                  lineHeight: 1.55,
+                }}
+              >
+                Individual posts often look harmless on their own. Add camera-roll
+                images or newsletter links on the left—or tap{' '}
+                <strong>Load Sample Creator Feed (6)</strong>—to see how Gemini
+                connects cross-platform patterns before you publish.
+              </p>
+            </section>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
