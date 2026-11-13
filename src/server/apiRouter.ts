@@ -5,9 +5,10 @@
  *
  * Feature Overview:
  * Exposes clean, ephemeral JSON endpoints with zero persistent user storage:
- *   - `GET  /api/health`         -> Runtime health, Gemini model ID, live-key status.
- *   - `GET  /api/demo-feed`      -> Persona + 6 sample creator posts for 1-tap demo.
- *   - `POST /api/import-article` -> Fetches & extracts prose from a public blog/Substack URL.
+ *   - `GET  /api/health`                -> Runtime health, Gemini model ID, live-key status.
+ *   - `GET  /api/demo-feed`             -> Persona + 6 sample creator posts for 1-tap demo.
+ *   - `POST /api/deepfake-shield/apply` -> Runs `python_shield/shield.py` on an uploaded photo.
+ *   - `POST /api/import-article`        -> Fetches & extracts prose from a public blog/Substack URL.
  *   - `POST /api/scan-exif`      -> Inspects image bytes for hidden EXIF GPS/time & optionally strips.
  *   - `POST /api/audit`          -> Hydrates local demo assets, checks T&C consent, runs Stage 1 + 2.
  *   - `POST /api/fix-post`       -> Runs Stage 3 caption rewriter + redaction planner.
@@ -36,6 +37,7 @@ import {
   verifyDeepfakeDefenseWithGemini,
 } from '../features/deepfake-shield/deepfakeShieldService';
 import { loadDemoShieldScreenshotsFromPublicDir } from '../features/deepfake-shield/nodeDeepfakeShieldHydrator';
+import { applyDeepfakeShieldCli } from '../features/deepfake-shield/nodeDeepfakeShieldCli';
 import {
   getMayaCreatorPersona,
   getMayaSamplePosts,
@@ -141,6 +143,31 @@ export async function handleApiRequest(
         attestation: body.attestation as OwnershipAttestation,
       });
       sendJsonResponse(res, 200, { report });
+      return true;
+    }
+
+    if (method === 'POST' && pathname === '/api/deepfake-shield/apply') {
+      const body = await readJsonBody<{
+        imageDataUrl?: string;
+        mode?: DeepfakeShieldMode;
+        opacityDelta?: number;
+      }>(req);
+
+      if (!body.imageDataUrl || typeof body.imageDataUrl !== 'string') {
+        sendJsonResponse(res, 400, {
+          error: 'imageDataUrl is required to apply the deepfake shield.',
+        });
+        return true;
+      }
+
+      const mode: DeepfakeShieldMode =
+        body.mode === 'balanced' || body.mode === 'max' ? body.mode : 'stealth';
+      const result = await applyDeepfakeShieldCli({
+        imageDataUrl: body.imageDataUrl,
+        mode,
+        opacityDelta: body.opacityDelta,
+      });
+      sendJsonResponse(res, 200, { result });
       return true;
     }
 

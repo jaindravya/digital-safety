@@ -16,6 +16,7 @@
 
 import {
   CreatorPost,
+  DeepfakeShieldApplyResult,
   DeepfakeShieldMode,
   DeepfakeShieldVerificationReport,
   PrivacyAuditReport,
@@ -174,6 +175,21 @@ export function createHttpPlatformBridge(
         },
       );
       return res.report;
+    },
+
+    async applyDeepfakeShield(params): Promise<DeepfakeShieldApplyResult> {
+      logFunctionCall('httpBridge.applyDeepfakeShield', {
+        mode: params.mode ?? 'stealth',
+        opacityDelta: params.opacityDelta,
+      });
+      const res = await requestJson<{ result: DeepfakeShieldApplyResult }>(
+        `${baseUrl}/api/deepfake-shield/apply`,
+        {
+          method: 'POST',
+          body: JSON.stringify(params),
+        },
+      );
+      return res.result;
     },
   };
 }

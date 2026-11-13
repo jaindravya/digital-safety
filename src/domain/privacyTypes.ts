@@ -254,3 +254,14 @@ export interface DeepfakeShieldVerificationReport {
   readonly shieldSucceeded: boolean;
   readonly usedDemoFallback: boolean;
 }
+
+/**
+ * Ephemeral output returned after running `python_shield/shield.py` on a creator-uploaded photo.
+ */
+export interface DeepfakeShieldApplyResult {
+  readonly protectedImageDataUrl: string;
+  readonly perturbationHeatmapDataUrl: string;
+  readonly opacityDelta: number;
+  readonly mode: DeepfakeShieldMode;
+  readonly appliedAtIso: string;
+}

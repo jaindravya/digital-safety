@@ -1,115 +1,73 @@
 /**
  * @file src/ui/components/PhotoNoiseView.tsx
- * @description Tab 4 Photo Noise view allowing creators to upload a photo,
- * choose defensive noise settings, and preview a basic UI before connecting
- * the backend perturbation service.
+ * @description Tab 4 Photo Noise / Anti-Deepfake Shield view integrating the
+ * `python_shield/shield.py` Safety Guardrail Watermark CLI via `UnseenPlatformBridge`.
  *
  * Feature Overview:
- *   - **Photo Uploader:** Reuses `readCameraRollFileToPost` (JPG/PNG/WebP/HEIC
- *     under 20MB) to load a photo strictly into volatile session RAM.
- *   - **Noise Controls:** Basic monochrome mode toggle (`Subtle` | `Cloak`)
- *     and strength slider (`5%`–`100%`).
- *   - **Pluggable Backend Hook:** Accepts an optional `onApplyNoise` prop so a
- *     future `/api/noise` endpoint can replace the built-in client-side
- *     placeholder preview with zero UI restructuring.
+ *   - **Photo Uploader:** Reuses `readCameraRollFileToPost` (`JPG`, `PNG`, `WebP`,
+ *     `HEIC` up to 20MB) to load a creator portrait strictly into volatile session RAM.
+ *   - **Guardrail Controls:** Monochrome preset selector (`Stealth` | `Balanced` | `Max`)
+ *     and luminance contrast slider (`--opacity 5..60`, default `20`).
+ *   - **CLI Output Preview:** Calls `onApplyShield` -> `POST /api/deepfake-shield/apply`
+ *     to execute `shield.py`, displaying `Original`, `Shielded`, and `12× Diff Map` views
+ *     plus one-tap PNG download.
  *
  * Primary Use Cases:
- * 1. Prototyping the photo-noise workflow in the 4th tab before backend APIs exist.
- * 2. Connecting a real backend noise/cloaking pipeline via `onApplyNoise`.
+ * 1. Uploading any portrait photo and embedding `[UNSEEN_SAFETY_GUARDRAIL_V1]` via `shield.py`.
+ * 2. Inspecting the `12×` amplified diff map to verify zero facial pixel noise.
  */
 
 import {
   Download,
   Image as ImageIcon,
   RefreshCw,
+  ShieldCheck,
   Sliders,
   Sparkles,
   Trash2,
   Upload,
 } from 'lucide-react';
 import React, { useRef, useState } from 'react';
+import {
+  DeepfakeShieldApplyResult,
+  DeepfakeShieldMode,
+} from '../../domain/privacyTypes';
 import { readCameraRollFileToPost } from '../../features/upload/cameraRollReader';
 import { logFunctionCall } from '../../logging/logger';
 
 /**
- * Supported defensive noise modes exposed in the UI.
+ * Request payload sent from `<PhotoNoiseView />` to `bridge.applyDeepfakeShield`.
  */
-export type PhotoNoiseMode = 'subtle' | 'cloak';
-
-/**
- * Request payload passed to the future backend photo-noise hook.
- */
-export interface PhotoNoiseRequest {
+export interface PhotoShieldApplyRequest {
   readonly imageDataUrl: string;
   readonly fileName: string;
-  readonly strength: number;
-  readonly mode: PhotoNoiseMode;
+  readonly mode: DeepfakeShieldMode;
+  readonly opacityDelta: number;
 }
 
 /**
  * Props accepted by `<PhotoNoiseView />`.
  */
 export interface PhotoNoiseViewProps {
-  /**
-   * Optional async hook for a future backend noise endpoint. When provided, it
-   * should return the processed `data:image/*` URL; when omitted, the UI runs a
-   * local canvas noise placeholder preview.
-   */
-  readonly onApplyNoise?: (request: PhotoNoiseRequest) => Promise<string | void>;
+  readonly onApplyShield?: (
+    request: PhotoShieldApplyRequest,
+  ) => Promise<DeepfakeShieldApplyResult>;
   readonly onNotify?: (message: string) => void;
 }
 
-/**
- * Generates a simple client-side canvas noise preview so the UI works end-to-end
- * while backend noise generation is not yet implemented.
- */
-async function renderPlaceholderNoisePreview(
-  imageDataUrl: string,
-  strength: number,
-  mode: PhotoNoiseMode,
-): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const img = new Image();
-    img.onload = () => {
-      const canvas = document.createElement('canvas');
-      canvas.width = img.naturalWidth || img.width;
-      canvas.height = img.naturalHeight || img.height;
-      const ctx = canvas.getContext('2d');
-      if (!ctx) {
-        reject(new Error('Could not initialize canvas preview context.'));
-        return;
-      }
+type PreviewTab = 'original' | 'protected' | 'diff';
 
-      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-      const frame = ctx.getImageData(0, 0, canvas.width, canvas.height);
-      const data = frame.data;
-      const amplitude =
-        mode === 'cloak' ? Math.round(strength * 0.9) : Math.round(strength * 0.45);
-
-      for (let i = 0; i < data.length; i += 4) {
-        const deltaR = (Math.random() * 2 - 1) * amplitude;
-        const deltaG =
-          mode === 'cloak' ? (Math.random() * 2 - 1) * amplitude : deltaR;
-        const deltaB =
-          mode === 'cloak' ? (Math.random() * 2 - 1) * amplitude : deltaR;
-        data[i] = Math.max(0, Math.min(255, data[i] + deltaR));
-        data[i + 1] = Math.max(0, Math.min(255, data[i + 1] + deltaG));
-        data[i + 2] = Math.max(0, Math.min(255, data[i + 2] + deltaB));
-      }
-
-      ctx.putImageData(frame, 0, 0);
-      resolve(canvas.toDataURL('image/png'));
-    };
-    img.onerror = () => reject(new Error('Could not decode photo for preview.'));
-    img.src = imageDataUrl;
-  });
-}
+const PRESET_OPACITY: Readonly<Record<DeepfakeShieldMode, number>> = {
+  stealth: 20,
+  balanced: 32,
+  max: 45,
+};
 
 /**
- * Renders the basic Photo Noise upload, controls, and preview UI in Tab 4.
+ * Renders Tab 4 Photo Noise / Anti-Deepfake Shield powered by `python_shield/shield.py`.
  *
- * @param props - Optional backend callback and toast notifier.
- * @returns Tab 4 Photo Noise view element.
+ * @param props - Backend bridge callback and optional toast notifier.
+ * @returns Tab 4 Photo Noise Shield element.
  */
 export function PhotoNoiseView(
   props: PhotoNoiseViewProps,
@@ -118,15 +76,18 @@ export function PhotoNoiseView(
 
   const [fileName, setFileName] = useState<string>('');
   const [originalDataUrl, setOriginalDataUrl] = useState<string | null>(null);
-  const [noisyDataUrl, setNoisyDataUrl] = useState<string | null>(null);
-  const [noiseMode, setNoiseMode] = useState<PhotoNoiseMode>('subtle');
-  const [strength, setStrength] = useState<number>(35);
-  const [viewMode, setViewMode] = useState<'original' | 'noisy'>('noisy');
+  const [shieldResult, setShieldResult] =
+    useState<DeepfakeShieldApplyResult | null>(null);
+  const [shieldMode, setShieldMode] = useState<DeepfakeShieldMode>('stealth');
+  const [opacityDelta, setOpacityDelta] = useState<number>(
+    PRESET_OPACITY.stealth,
+  );
+  const [viewMode, setViewMode] = useState<PreviewTab>('protected');
   const [isApplying, setIsApplying] = useState<boolean>(false);
   const [localError, setLocalError] = useState<string | null>(null);
 
   /**
-   * Handles selecting a photo from the user's device into volatile RAM.
+   * Handles selecting a portrait image into volatile session RAM.
    */
   async function handleFileSelected(
     event: React.ChangeEvent<HTMLInputElement>,
@@ -142,9 +103,9 @@ export function PhotoNoiseView(
       const post = await readCameraRollFileToPost(file, 0);
       setFileName(file.name);
       setOriginalDataUrl(post.imageDataUrl ?? null);
-      setNoisyDataUrl(null);
+      setShieldResult(null);
       setViewMode('original');
-      props.onNotify?.(`Loaded "${file.name}" into RAM.`);
+      props.onNotify?.(`Loaded "${file.name}" into volatile RAM.`);
     } catch (err) {
       setLocalError(
         err instanceof Error ? err.message : 'Could not load selected photo.',
@@ -152,46 +113,40 @@ export function PhotoNoiseView(
     }
   }
 
-  /**
-   * Triggers either the plugged-in backend callback or the basic local placeholder.
-   */
-  async function handleApplyNoise(): Promise<void> {
-    if (!originalDataUrl) return;
+  function handleSelectMode(nextMode: DeepfakeShieldMode): void {
+    setShieldMode(nextMode);
+    setOpacityDelta(PRESET_OPACITY[nextMode]);
+  }
 
-    logFunctionCall('PhotoNoiseView.handleApplyNoise', {
-      mode: noiseMode,
-      strength,
-      hasBackendHook: Boolean(props.onApplyNoise),
+  /**
+   * Invokes `python_shield/shield.py` through `POST /api/deepfake-shield/apply`.
+   */
+  async function handleApplyShield(): Promise<void> {
+    if (!originalDataUrl || !props.onApplyShield) return;
+
+    logFunctionCall('PhotoNoiseView.handleApplyShield', {
+      mode: shieldMode,
+      opacityDelta,
     });
     setLocalError(null);
     setIsApplying(true);
 
     try {
-      let resultUrl: string | void = undefined;
-      if (props.onApplyNoise) {
-        resultUrl = await props.onApplyNoise({
-          imageDataUrl: originalDataUrl,
-          fileName: fileName || 'photo.png',
-          strength,
-          mode: noiseMode,
-        });
-      }
+      const result = await props.onApplyShield({
+        imageDataUrl: originalDataUrl,
+        fileName: fileName || 'portrait.png',
+        mode: shieldMode,
+        opacityDelta,
+      });
 
-      const nextUrl =
-        typeof resultUrl === 'string' && resultUrl.length > 0
-          ? resultUrl
-          : await renderPlaceholderNoisePreview(originalDataUrl, strength, noiseMode);
-
-      setNoisyDataUrl(nextUrl);
-      setViewMode('noisy');
+      setShieldResult(result);
+      setViewMode('protected');
       props.onNotify?.(
-        props.onApplyNoise
-          ? 'Defensive noise applied.'
-          : 'UI placeholder noise preview ready (backend pending).',
+        `Applied safety guardrail watermark (opacity ±${result.opacityDelta}).`,
       );
     } catch (err) {
       setLocalError(
-        err instanceof Error ? err.message : 'Failed to apply noise preview.',
+        err instanceof Error ? err.message : 'Failed to run deepfake shield CLI.',
       );
     } finally {
       setIsApplying(false);
@@ -201,44 +156,62 @@ export function PhotoNoiseView(
   function handleClearPhoto(): void {
     setFileName('');
     setOriginalDataUrl(null);
-    setNoisyDataUrl(null);
+    setShieldResult(null);
     setLocalError(null);
     setViewMode('original');
   }
 
-  function handleDownloadPreview(): void {
-    const activeUrl = noisyDataUrl ?? originalDataUrl;
+  function getDisplayedImageUrl(): string | null {
+    if (!shieldResult) return originalDataUrl;
+    if (viewMode === 'diff') return shieldResult.perturbationHeatmapDataUrl;
+    if (viewMode === 'protected') return shieldResult.protectedImageDataUrl;
+    return originalDataUrl;
+  }
+
+  function handleDownloadCurrent(): void {
+    const activeUrl = getDisplayedImageUrl();
     if (!activeUrl) return;
     const baseName = (fileName || 'unseen-photo').replace(/\.[^.]+$/, '');
+    const suffix =
+      viewMode === 'diff'
+        ? '-guardrail-12x-diff'
+        : shieldResult && viewMode === 'protected'
+          ? '-shielded'
+          : '-original';
     const anchor = document.createElement('a');
     anchor.href = activeUrl;
-    anchor.download = `${baseName}-noisy-preview.png`;
+    anchor.download = `${baseName}${suffix}.png`;
     document.body.appendChild(anchor);
     anchor.click();
     document.body.removeChild(anchor);
   }
 
-  const displayedUrl =
-    viewMode === 'noisy' && noisyDataUrl ? noisyDataUrl : originalDataUrl;
+  const displayedUrl = getDisplayedImageUrl();
 
   return (
-    <section aria-label="Photo Noise Shield">
+    <section aria-label="Photo Noise & Anti-Deepfake Shield">
       <div className="unseen-hero">
-        <p className="unseen-hero-eyebrow">Photo Noise Studio (Basic UI)</p>
-        <h2 className="unseen-hero-title">Add Noise Before You Post.</h2>
+        <p className="unseen-hero-eyebrow">Anti-Deepfake Guardrail CLI</p>
+        <h2 className="unseen-hero-title">
+          Shield Your Portraits Before Posting.
+        </h2>
         <p className="unseen-hero-sub">
-          Upload a photo and tune a noise strength level. This lightweight frontend
-          shell is ready for your backend perturbation service to plug into later.
+          Embeds luminance-adaptive Safety Guardrail watermarks across background
+          perimeter zones using <code>python_shield/shield.py</code> while keeping
+          facial pixels untouched.
         </p>
       </div>
 
       <div className="unseen-split-grid">
-        {/* Left column: Upload & Noise Controls */}
+        {/* Left column: Upload & CLI Options */}
         <div className="unseen-col-stack">
           <div className="unseen-cream-card">
             <div className="unseen-section-head" style={{ marginBottom: '12px' }}>
-              <h3 className="unseen-card-title">1. Upload Photo</h3>
-              <span className="unseen-pill platform">UI Placeholder</span>
+              <h3 className="unseen-card-title">1. Upload Portrait</h3>
+              <span className="unseen-pill low">
+                <span className="unseen-pill-dot" />
+                CLI Connected
+              </span>
             </div>
 
             <input
@@ -259,7 +232,7 @@ export function PhotoNoiseView(
                 {fileName ? `Replace Photo (${fileName})` : 'Choose Photo from Device'}
               </span>
               <span style={{ fontSize: '0.72rem', color: 'var(--card-ink-subtle)' }}>
-                JPG, PNG, WebP, or HEIC · Up to 20MB · Volatile RAM only
+                JPG, PNG, WebP, or HEIC · Up to 20MB · Ephemeral processing only
               </span>
             </button>
 
@@ -282,7 +255,7 @@ export function PhotoNoiseView(
 
             <div style={{ marginTop: '18px' }}>
               <div className="unseen-section-head" style={{ marginBottom: '8px' }}>
-                <span className="unseen-card-label">2. Noise Mode</span>
+                <span className="unseen-card-label">2. Guardrail Preset</span>
                 <span
                   style={{
                     fontSize: '0.72rem',
@@ -290,55 +263,77 @@ export function PhotoNoiseView(
                     fontWeight: 600,
                   }}
                 >
-                  Backend hook ready
+                  Zero face/neck pixel edits
                 </span>
               </div>
 
-              <div className="unseen-mono-track full" role="tablist" aria-label="Noise Mode">
+              <div
+                className="unseen-mono-track full"
+                role="tablist"
+                aria-label="Guardrail Preset"
+              >
                 <button
                   type="button"
                   role="tab"
-                  aria-selected={noiseMode === 'subtle'}
-                  className={`unseen-mono-option ${noiseMode === 'subtle' ? 'active' : ''}`}
-                  onClick={() => setNoiseMode('subtle')}
+                  aria-selected={shieldMode === 'stealth'}
+                  className={`unseen-mono-option ${
+                    shieldMode === 'stealth' ? 'active' : ''
+                  }`}
+                  onClick={() => handleSelectMode('stealth')}
                 >
-                  Subtle Grain
+                  Stealth
                 </button>
                 <button
                   type="button"
                   role="tab"
-                  aria-selected={noiseMode === 'cloak'}
-                  className={`unseen-mono-option ${noiseMode === 'cloak' ? 'active' : ''}`}
-                  onClick={() => setNoiseMode('cloak')}
+                  aria-selected={shieldMode === 'balanced'}
+                  className={`unseen-mono-option ${
+                    shieldMode === 'balanced' ? 'active' : ''
+                  }`}
+                  onClick={() => handleSelectMode('balanced')}
                 >
-                  Adversarial Cloak
+                  Balanced
+                </button>
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={shieldMode === 'max'}
+                  className={`unseen-mono-option ${
+                    shieldMode === 'max' ? 'active' : ''
+                  }`}
+                  onClick={() => handleSelectMode('max')}
+                >
+                  Max
                 </button>
               </div>
             </div>
 
             <div style={{ marginTop: '18px' }}>
               <div className="unseen-section-head" style={{ marginBottom: '6px' }}>
-                <label htmlFor="noise-strength-range" className="unseen-card-label">
-                  <Sliders size={12} style={{ verticalAlign: 'middle', marginRight: '5px' }} />
-                  3. Noise Strength
+                <label htmlFor="shield-opacity-range" className="unseen-card-label">
+                  <Sliders
+                    size={12}
+                    style={{ verticalAlign: 'middle', marginRight: '5px' }}
+                  />
+                  3. Luminance Delta (--opacity)
                 </label>
                 <span
                   className="unseen-mono-num"
                   style={{ fontSize: '0.84rem', fontWeight: 800, color: 'var(--card-ink)' }}
                 >
-                  {strength}%
+                  ±{opacityDelta}
                 </span>
               </div>
 
               <input
-                id="noise-strength-range"
+                id="shield-opacity-range"
                 type="range"
                 min={5}
-                max={100}
-                step={5}
-                value={strength}
+                max={60}
+                step={1}
+                value={opacityDelta}
                 className="unseen-range"
-                onChange={(e) => setStrength(Number(e.target.value))}
+                onChange={(e) => setOpacityDelta(Number(e.target.value))}
               />
               <div
                 style={{
@@ -349,9 +344,9 @@ export function PhotoNoiseView(
                   marginTop: '4px',
                 }}
               >
-                <span>5% (Minimal)</span>
-                <span>50% (Balanced)</span>
-                <span>100% (Heavy)</span>
+                <span>±5 (Faint)</span>
+                <span>±20 (CLI Default)</span>
+                <span>±60 (High Contrast)</span>
               </div>
             </div>
 
@@ -367,15 +362,21 @@ export function PhotoNoiseView(
                 type="button"
                 className="unseen-btn unseen-btn-dark"
                 style={{ flex: 1 }}
-                disabled={!originalDataUrl || isApplying}
-                onClick={handleApplyNoise}
+                disabled={!originalDataUrl || isApplying || !props.onApplyShield}
+                onClick={handleApplyShield}
               >
                 {isApplying ? (
                   <RefreshCw size={15} className="unseen-spin" aria-hidden="true" />
                 ) : (
                   <Sparkles size={15} aria-hidden="true" />
                 )}
-                <span>{noisyDataUrl ? 'Re-apply Noise' : 'Add Noise'}</span>
+                <span>
+                  {isApplying
+                    ? 'Running shield.py…'
+                    : shieldResult
+                      ? 'Re-run Safety Shield'
+                      : 'Apply Safety Shield'}
+                </span>
               </button>
 
               {originalDataUrl && (
@@ -392,30 +393,35 @@ export function PhotoNoiseView(
           </div>
 
           <div className="unseen-cream-card compact">
-            <p
-              style={{
-                margin: 0,
-                fontSize: '0.76rem',
-                lineHeight: 1.5,
-                color: 'var(--card-ink-muted)',
-              }}
-            >
-              <strong>Backend plug-in point:</strong> Pass{' '}
-              <code>onApplyNoise</code> into <code>&lt;PhotoNoiseView /&gt;</code> in{' '}
-              <code>src/ui/App.tsx</code> to send{' '}
-              <code>&#123; imageDataUrl, strength, mode &#125;</code> to the server once
-              implemented. Until then, clicking <strong>Add Noise</strong> renders a
-              basic local canvas preview.
-            </p>
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-start' }}>
+              <ShieldCheck
+                size={16}
+                color="var(--card-plum)"
+                style={{ flexShrink: 0, marginTop: '2px' }}
+                aria-hidden="true"
+              />
+              <p
+                style={{
+                  margin: 0,
+                  fontSize: '0.76rem',
+                  lineHeight: 1.5,
+                  color: 'var(--card-ink-muted)',
+                }}
+              >
+                <code>POST /api/deepfake-shield/apply</code> runs{' '}
+                <code>python_shield/shield.py</code> in a disposable temp folder that is
+                wiped immediately after returning the PNG outputs—zero photos are stored.
+              </p>
+            </div>
           </div>
         </div>
 
-        {/* Right column: Preview Panel */}
+        {/* Right column: Original / Shielded / 12× Diff Map Preview */}
         <div className="unseen-col-stack">
           <div className="unseen-cream-card">
             <div className="unseen-section-head" style={{ marginBottom: '14px' }}>
               <div>
-                <h3 className="unseen-card-title">Photo Preview</h3>
+                <h3 className="unseen-card-title">Shield Output Preview</h3>
                 <p
                   style={{
                     margin: '3px 0 0',
@@ -423,16 +429,16 @@ export function PhotoNoiseView(
                     color: 'var(--card-ink-muted)',
                   }}
                 >
-                  {noisyDataUrl
-                    ? `Previewing ${noiseMode === 'cloak' ? 'Adversarial Cloak' : 'Subtle Grain'} at ${strength}% strength`
+                  {shieldResult
+                    ? `Processed via shield.py (${shieldResult.mode}, opacity ±${shieldResult.opacityDelta})`
                     : originalDataUrl
-                      ? 'Photo staged. Click "Add Noise" to generate a preview.'
+                      ? 'Photo staged. Click "Apply Safety Shield" to embed guardrails.'
                       : 'No photo uploaded yet.'}
                 </p>
               </div>
 
-              {noisyDataUrl && (
-                <div className="unseen-mono-track" role="group" aria-label="Comparison">
+              {shieldResult && (
+                <div className="unseen-mono-track" role="group" aria-label="Output Comparison">
                   <button
                     type="button"
                     className={`unseen-mono-option ${viewMode === 'original' ? 'active' : ''}`}
@@ -442,10 +448,17 @@ export function PhotoNoiseView(
                   </button>
                   <button
                     type="button"
-                    className={`unseen-mono-option ${viewMode === 'noisy' ? 'active' : ''}`}
-                    onClick={() => setViewMode('noisy')}
+                    className={`unseen-mono-option ${viewMode === 'protected' ? 'active' : ''}`}
+                    onClick={() => setViewMode('protected')}
                   >
-                    Noisy
+                    Shielded
+                  </button>
+                  <button
+                    type="button"
+                    className={`unseen-mono-option ${viewMode === 'diff' ? 'active' : ''}`}
+                    onClick={() => setViewMode('diff')}
+                  >
+                    12× Diff Map
                   </button>
                 </div>
               )}
@@ -456,9 +469,11 @@ export function PhotoNoiseView(
                 <img
                   src={displayedUrl}
                   alt={
-                    viewMode === 'noisy' && noisyDataUrl
-                      ? 'Photo with defensive noise preview applied'
-                      : 'Original uploaded photo preview'
+                    viewMode === 'diff'
+                      ? '12x amplified guardrail perturbation map showing protected face mask'
+                      : viewMode === 'protected' && shieldResult
+                        ? 'Portrait protected with Unseen Safety Guardrail watermark'
+                        : 'Original uploaded portrait'
                   }
                 />
               </div>
@@ -476,12 +491,13 @@ export function PhotoNoiseView(
                     maxWidth: '280px',
                   }}
                 >
-                  Select an image on the left to test the photo noise flow.
+                  Upload a portrait photo to compare the Original, Shielded, and 12×
+                  Guardrail Map outputs.
                 </p>
               </div>
             )}
 
-            {noisyDataUrl && (
+            {shieldResult && (
               <div
                 style={{
                   display: 'flex',
@@ -494,15 +510,19 @@ export function PhotoNoiseView(
               >
                 <span className="unseen-pill addressed">
                   <span className="unseen-pill-dot" />
-                  Client Preview Ready
+                  Face Pixels 100% Untouched
                 </span>
                 <button
                   type="button"
                   className="unseen-btn unseen-btn-sand unseen-btn-sm"
-                  onClick={handleDownloadPreview}
+                  onClick={handleDownloadCurrent}
                 >
                   <Download size={14} aria-hidden="true" />
-                  <span>Download Preview PNG</span>
+                  <span>
+                    {viewMode === 'diff'
+                      ? 'Download 12× Diff PNG'
+                      : 'Download Shielded PNG'}
+                  </span>
                 </button>
               </div>
             )}

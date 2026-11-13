@@ -18,6 +18,7 @@
 import {
   CreatorPost,
   CrossPlatformRisk,
+  DeepfakeShieldApplyResult,
   DeepfakeShieldMode,
   DeepfakeShieldVerificationReport,
   PostDisclosureFinding,
@@ -78,4 +79,9 @@ export interface UnseenPlatformBridge {
     readonly protectedScreenshotDataUrl?: string;
     readonly attestation: OwnershipAttestation;
   }): Promise<DeepfakeShieldVerificationReport>;
+  applyDeepfakeShield(params: {
+    readonly imageDataUrl: string;
+    readonly mode?: DeepfakeShieldMode;
+    readonly opacityDelta?: number;
+  }): Promise<DeepfakeShieldApplyResult>;
 }

@@ -19,7 +19,10 @@
  * 2. Concrete API testing evidence for Rubric #2 (Working Prototype).
  */
 
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { IncomingMessage, ServerResponse } from 'node:http';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { Readable } from 'node:stream';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { clearAnonymousFeedback } from '../src/features/feedback/accuracyFeedbackStore';
@@ -160,6 +163,49 @@ describe('Unified Server — API Routes & Guardrail Enforcement', () => {
     expect(feedback.statusCode).toBe(200);
     expect(feedback.json.thumbsUpCount).toBe(1);
     expect(JSON.stringify(feedback.json)).not.toContain('2840 Hyperion Avenue');
+  });
+
+  it('applies python_shield/shield.py via POST /api/deepfake-shield/apply and cleans up temp files', async () => {
+    const sampleImagePath = join(
+      process.cwd(),
+      'public',
+      'demo-media',
+      'deepfake-shield',
+      'sample_face.jpg',
+    );
+    expect(existsSync(sampleImagePath)).toBe(true);
+    const sampleDataUrl = `data:image/jpeg;base64,${readFileSync(sampleImagePath).toString('base64')}`;
+
+    const beforeTmpCount = readdirSync(tmpdir()).filter((entry) =>
+      entry.startsWith('unseen-shield-'),
+    ).length;
+
+    const response = await invokeApiRouteInMemory({
+      method: 'POST',
+      url: '/api/deepfake-shield/apply',
+      body: {
+        imageDataUrl: sampleDataUrl,
+        mode: 'balanced',
+        opacityDelta: 24,
+      },
+    });
+
+    expect(response.statusCode).toBe(200);
+    const result = response.json.result as {
+      protectedImageDataUrl: string;
+      perturbationHeatmapDataUrl: string;
+      opacityDelta: number;
+      mode: string;
+    };
+    expect(result.mode).toBe('balanced');
+    expect(result.opacityDelta).toBe(24);
+    expect(result.protectedImageDataUrl).toMatch(/^data:image\/png;base64,/);
+    expect(result.perturbationHeatmapDataUrl).toMatch(/^data:image\/png;base64,/);
+
+    const afterTmpCount = readdirSync(tmpdir()).filter((entry) =>
+      entry.startsWith('unseen-shield-'),
+    ).length;
+    expect(afterTmpCount).toBe(beforeTmpCount);
   });
 });
 

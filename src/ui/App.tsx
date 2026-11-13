@@ -514,7 +514,16 @@ export function App(): React.ReactElement {
         )}
 
         {activeTab === 'noise' && (
-          <PhotoNoiseView onNotify={setToastMessage} />
+          <PhotoNoiseView
+            onApplyShield={(request) =>
+              bridge.applyDeepfakeShield({
+                imageDataUrl: request.imageDataUrl,
+                mode: request.mode,
+                opacityDelta: request.opacityDelta,
+              })
+            }
+            onNotify={setToastMessage}
+          />
         )}
       </main>
 
