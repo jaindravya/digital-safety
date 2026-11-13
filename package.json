@@ -1,0 +1,20 @@
+{
+  "name": "privacy-mirror",
+  "version": "0.1.0",
+  "private": true,
+  "description": "PrivacyMirror: AI-powered cross-platform digital safety assistant for women creators",
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "@google/genai": "^1.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "typescript": "^5.7.2",
+    "vitest": "^3.0.5"
+  }
+}
