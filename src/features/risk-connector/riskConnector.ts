@@ -53,11 +53,11 @@ interface RawRiskSynthesisResponse {
 }
 
 const RISK_CONNECT_SYSTEM_INSTRUCTION = `You are Stage 2 of Unseen, an AI digital safety assistant for women creators.
-Given per-post structured clues from a creator's own photos, drafts, and blog/Substack articles:
-1. Group related clues across multiple posts/platforms to detect CUMULATIVE exposure (especially recurring weekly routines or repeated neighborhood surroundings).
-2. Also surface urgent standalone exposures (visible mail/shipping labels, hotel keycards, or live "right now" drafts).
-3. For every risk, write an abstractConfidenceStatement starting with "With X% confidence, ..." that communicates what pattern can be inferred WITHOUT EVER naming specific street addresses, apartment/room numbers,venue names, or coordinates.
-4. Reference practical creator safety guidance (such as RAINN's recommendation to delay location sharing until after leaving a venue and avoid publishing predictable schedules).`;
+Given per-post structured clues from a creator's own photos, binary EXIF metadata scans, drafts, and blog/Substack articles:
+1. Group related clues across multiple posts/platforms to detect CUMULATIVE exposure (especially recurring weekly routines, EXIF capture-time patterns, or repeated neighborhood surroundings).
+2. Also surface urgent standalone exposures (hidden EXIF GPS headers in raw photo files, visible mail/shipping labels, hotel keycards, or live "right now" drafts).
+3. For every risk, write an abstractConfidenceStatement starting with "With X% confidence, ..." that communicates what pattern can be inferred WITHOUT EVER naming specific street addresses, apartment/room numbers, venue names, or coordinates.
+4. Reference practical creator safety guidance (such as RAINN's recommendation to delay location sharing until after leaving a venue, strip EXIF GPS headers before sharing raw files, and avoid publishing predictable schedules).`;
 
 const RISK_CONNECT_RESPONSE_SCHEMA: Schema = {
   type: Type.OBJECT,
@@ -193,12 +193,12 @@ export function buildFallbackConnectedRisks(
         'RAINN advises sharing event locations and geotags only after departing the area.',
     },
     sensitive_document_or_pii: {
-      title: 'Readable shipping label in background flatlay',
-      why: 'High-resolution desk photos allow viewers to zoom into parcel labels and barcodes containing residential delivery information.',
+      title: 'Hidden EXIF GPS or readable PII in photo',
+      why: 'Original camera-roll files can carry invisible EXIF GPS coordinates and high-resolution parcel labels/barcodes containing residential location details.',
       action:
-        'Apply Smart Blur or crop over the lower-right parcel envelope before publishing.',
+        'Export an EXIF-stripped PNG and apply Smart Blur over any visible labels, mail, or badges before publishing.',
       reference:
-        'Personal mail, barcodes, and delivery labels are primary sources of unintentional self-doxxing.',
+        'Embedded EXIF GPS tags, personal mail, and delivery labels are primary sources of unintentional self-doxxing.',
     },
     travel_or_lodging_clue: {
       title: 'Active hotel stay & keycard sleeve exposure',

@@ -72,6 +72,14 @@ export interface UnseenConfig {
     readonly defaultBlurRadiusPx: number;
     readonly boundingBoxPaddingRatio: number;
   };
+  readonly exif: {
+    readonly maxScanBytes: number;
+    readonly maxIfdEntries: number;
+    readonly gpsConfidencePercentage: number;
+    readonly timestampConfidencePercentage: number;
+    readonly autoStripOnClientUpload: boolean;
+    readonly autoStripOnCanvasExport: boolean;
+  };
   readonly guardrails: {
     readonly requireOwnershipAttestation: boolean;
     readonly streetAddressPattern: RegExp;
@@ -156,6 +164,14 @@ export function createAppConfig(): UnseenConfig {
     redaction: Object.freeze({
       defaultBlurRadiusPx: 18,
       boundingBoxPaddingRatio: 0.04,
+    }),
+    exif: Object.freeze({
+      maxScanBytes: 2 * 1024 * 1024,
+      maxIfdEntries: 128,
+      gpsConfidencePercentage: 99,
+      timestampConfidencePercentage: 92,
+      autoStripOnClientUpload: true,
+      autoStripOnCanvasExport: true,
     }),
     guardrails: Object.freeze({
       requireOwnershipAttestation: true,

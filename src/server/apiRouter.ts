@@ -8,6 +8,7 @@
  *   - `GET  /api/health`         -> Runtime health, Gemini model ID, live-key status.
  *   - `GET  /api/demo-feed`      -> Persona + 6 sample creator posts for 1-tap demo.
  *   - `POST /api/import-article` -> Fetches & extracts prose from a public blog/Substack URL.
+ *   - `POST /api/scan-exif`      -> Inspects image bytes for hidden EXIF GPS/time & optionally strips.
  *   - `POST /api/audit`          -> Hydrates local demo assets, checks T&C consent, runs Stage 1 + 2.
  *   - `POST /api/fix-post`       -> Runs Stage 3 caption rewriter + redaction planner.
  *   - `POST /api/feedback`       -> Records anonymous Thumbs Up / Thumbs Down rating.
@@ -34,6 +35,11 @@ import {
   getMayaSamplePosts,
 } from '../features/demo-dataset/mayaCreatorFeed';
 import { hydratePostsMediaBatch } from '../features/demo-dataset/nodeDemoMediaHydrator';
+import {
+  buildExifDisclosureClues,
+  scanImageDataUrlForExifPrivacy,
+} from '../features/exif-scanner/exifMetadataScanner';
+import { stripBinaryMetadataFromDataUrl } from '../features/exif-scanner/exifMetadataStripper';
 import {
   AccuracyRating,
   getAnonymousFeedbackSummary,
@@ -108,6 +114,40 @@ export async function handleApiRequest(
       }
       const post = await fetchAndExtractArticlePost(body.url);
       sendJsonResponse(res, 200, { post });
+      return true;
+    }
+
+    if (method === 'POST' && pathname === '/api/scan-exif') {
+      const body = await readJsonBody<{
+        imageDataUrl?: string;
+        stripMetadata?: boolean;
+      }>(req);
+
+      if (!body.imageDataUrl || typeof body.imageDataUrl !== 'string') {
+        sendJsonResponse(res, 400, {
+          error: 'imageDataUrl is required for EXIF privacy scanning.',
+        });
+        return true;
+      }
+
+      const exifSummary = scanImageDataUrlForExifPrivacy(body.imageDataUrl);
+      const clues = buildExifDisclosureClues(exifSummary);
+
+      if (body.stripMetadata) {
+        const stripped = stripBinaryMetadataFromDataUrl(body.imageDataUrl);
+        sendJsonResponse(res, 200, {
+          exifSummary: {
+            ...exifSummary,
+            metadataWasAutoStripped: stripped.strippedSegmentsCount > 0,
+          },
+          clues,
+          cleanImageDataUrl: stripped.cleanDataUrl,
+          strippedSegmentsCount: stripped.strippedSegmentsCount,
+        });
+        return true;
+      }
+
+      sendJsonResponse(res, 200, { exifSummary, clues });
       return true;
     }
 

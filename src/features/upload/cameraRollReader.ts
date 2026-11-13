@@ -1,22 +1,32 @@
 /**
  * @file src/features/upload/cameraRollReader.ts
- * @description Validator and client-side reader converting original Android/Mac
- * camera-roll photo files into ephemeral `CreatorPost` items.
+ * @description Validator, client-side EXIF privacy inspector, and local metadata
+ * auto-stripper converting original Android/iOS/Mac camera-roll photo files into
+ * ephemeral `CreatorPost` items.
  *
  * Feature Overview:
- * Enforces Unseen's MVP media rules on uploaded files:
+ * Enforces Unseen's MVP media and Responsible Design rules on uploaded files:
  *   - Accepts original image formats (`image/jpeg`, `image/png`, `image/webp`, `image/heic`).
  *   - Enforces a strict `20MB` per-photo cap.
  *   - Clearly rejects video files (`video/*`) with a friendly note explaining that
  *     short-form video & Reels auditing is planned for V1.
+ *   - Inspects raw uploaded photo bytes for hidden EXIF GPS coordinates, capture
+ *     timestamps, and hardware serial tags (`scanImageDataUrlForExifPrivacy`), records
+ *     a zero-PII `exifScanSummary` for Stage 1 & Stage 2 auditing, and immediately
+ *     strips raw EXIF headers in memory (`stripBinaryMetadataFromDataUrl`) so raw GPS
+ *     coordinates never leave the creator's device or persist in exported downloads.
  *
  * Primary Use Cases:
  * 1. Validating files chosen from the Android Gallery / iOS Photo Library / Mac Finder.
- * 2. Reading valid photos into ephemeral in-memory base64 data URLs (`CreatorPost`).
+ * 2. Reading valid photos into sanitized in-memory data URLs (`CreatorPost`) with
+ *    preserved zero-PII EXIF risk telemetry.
  */
 
-import { CreatorPost } from '../../domain/privacyTypes';
+import { APP_CONFIG } from '../../config/appConfig';
+import { CreatorPost, ExifPrivacyScanSummary } from '../../domain/privacyTypes';
 import { logFunctionCall } from '../../logging/logger';
+import { scanImageDataUrlForExifPrivacy } from '../exif-scanner/exifMetadataScanner';
+import { stripBinaryMetadataFromDataUrl } from '../exif-scanner/exifMetadataStripper';
 
 /**
  * Maximum allowed raw photo size in bytes (`20MB`).
@@ -74,8 +84,59 @@ export function validateCameraRollFile(
 }
 
 /**
- * Reads a browser `File` into a `data:image/*;base64,...` string and constructs a
- * ready-to-edit `CreatorPost` item.
+ * Inspects a raw camera-roll base64 data URL for hidden EXIF GPS and capture-time
+ * metadata, then auto-strips binary EXIF/XMP segments when enabled in `APP_CONFIG.exif`.
+ *
+ * @param rawDataUrl - Raw base64 data URL read from the user's selected photo file.
+ * @returns Sanitized `imageDataUrl`, zero-PII `exifScanSummary`, and user-facing `postedAtLabel`.
+ */
+export function inspectAndSanitizeUploadedDataUrl(rawDataUrl: string): {
+  readonly sanitizedDataUrl: string;
+  readonly exifScanSummary: ExifPrivacyScanSummary;
+  readonly postedAtLabel: string;
+} {
+  logFunctionCall('inspectAndSanitizeUploadedDataUrl', {
+    inputLength: rawDataUrl.length,
+  });
+
+  const rawScan = scanImageDataUrlForExifPrivacy(rawDataUrl);
+
+  let sanitizedDataUrl = rawDataUrl;
+  let strippedSegmentsCount = 0;
+
+  if (APP_CONFIG.exif.autoStripOnClientUpload && rawScan.hasExifMetadata) {
+    const stripped = stripBinaryMetadataFromDataUrl(rawDataUrl);
+    sanitizedDataUrl = stripped.cleanDataUrl;
+    strippedSegmentsCount = stripped.strippedSegmentsCount;
+  }
+
+  const exifScanSummary: ExifPrivacyScanSummary = {
+    ...rawScan,
+    metadataWasAutoStripped: strippedSegmentsCount > 0,
+  };
+
+  let postedAtLabel = 'Original photo · Add caption or timing note below';
+  if (exifScanSummary.hasEmbeddedGps) {
+    postedAtLabel = exifScanSummary.metadataWasAutoStripped
+      ? 'Original photo · Hidden EXIF GPS metadata detected & auto-stripped'
+      : 'Original photo · Hidden EXIF GPS metadata detected in file';
+  } else if (
+    exifScanSummary.hasCaptureTimestamp &&
+    exifScanSummary.captureTimeWindowCue
+  ) {
+    postedAtLabel = `Original photo · EXIF capture window: ${exifScanSummary.captureTimeWindowCue}`;
+  }
+
+  return {
+    sanitizedDataUrl,
+    exifScanSummary,
+    postedAtLabel,
+  };
+}
+
+/**
+ * Reads a browser `File` into a `data:image/*;base64,...` string, inspects & strips
+ * hidden EXIF GPS/capture metadata locally, and constructs a ready-to-audit `CreatorPost`.
  *
  * @param file - Validated browser `File` object from an `<input type="file">`.
  * @param indexOffset - Numeric index used to generate a stable ephemeral ID.
@@ -100,18 +161,21 @@ export function readCameraRollFileToPost(
 
     const reader = new FileReader();
     reader.onload = () => {
-      const dataUrl = typeof reader.result === 'string' ? reader.result : '';
+      const rawDataUrl = typeof reader.result === 'string' ? reader.result : '';
+      const { sanitizedDataUrl, exifScanSummary, postedAtLabel } =
+        inspectAndSanitizeUploadedDataUrl(rawDataUrl);
       const cleanTitle = file.name.replace(/\.[^.]+$/, '');
       resolve({
         id: `cam-${Date.now()}-${indexOffset}`,
         platform: 'camera_roll',
         title: `Camera Roll · ${cleanTitle}`,
         caption: '',
-        postedAtLabel: 'Original photo · Add caption or timing note below',
+        postedAtLabel,
         isDraft: true,
-        imageDataUrl: dataUrl,
+        imageDataUrl: sanitizedDataUrl,
         mediaMimeType: file.type || 'image/jpeg',
         mediaAltDescription: `Uploaded camera-roll photo (${file.name})`,
+        exifScanSummary,
       });
     };
     reader.onerror = () =>

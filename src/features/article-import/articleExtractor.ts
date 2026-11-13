@@ -1,25 +1,40 @@
 /**
  * @file src/features/article-import/articleExtractor.ts
- * @description Safe blog and Substack article URL importer and readable text extractor.
+ * @description Safe blog and Substack article URL importer extracting readable prose
+ * AND inspecting embedded article photos for hidden EXIF GPS & capture-time metadata.
  *
  * Feature Overview:
  * Creators often reveal weekly habits, neighborhood routines, or upcoming event dates
- * in written newsletters (Substack, Medium, personal blogs) that combine with their
- * camera-roll photos to expose sensitive patterns. Rather than relying on brittle
- * social-media scrapers, this module fetches publicly accessible `http`/`https`
- * article pages, blocks local/private SSRF targets, extracts clean readable prose
- * from HTML, and packages the article into a `CreatorPost` ready for Gemini Stage 1
- * and Stage 2 cross-content analysis.
+ * in written newsletters (Substack, Medium, personal blogs)—and unlike Instagram, many
+ * blogs and newsletter CDNs serve original uploaded photo files with EXIF GPS and
+ * `DateTimeOriginal` capture timestamps still intact!
+ *
+ * Rather than relying on brittle social-media scrapers, this module:
+ *   1. Fetches publicly accessible `http`/`https` article pages while blocking local
+ *      and private-network SSRF targets (`validatePublicArticleUrl`).
+ *   2. Extracts clean titles, readable prose, and the article's primary embedded photo
+ *      URL (`<article><img ...>` or `og:image`).
+ *   3. Downloads the article's lead image (when available), scans its binary headers
+ *      for hidden EXIF GPS, timestamp, and camera metadata (`scanImageBytesForExifPrivacy`),
+ *      strips raw EXIF coordinates into a clean `imageDataUrl`, and packages both prose
+ *      and photo telemetry into a `CreatorPost` for Stage 1 & Stage 2 analysis.
  *
  * Primary Use Cases:
- * 1. Pasting a Substack or blog post link alongside camera-roll photos on Android or Mac.
+ * 1. Pasting a Substack or blog post link on Android or Mac to audit both written
+ *    routines and hidden EXIF metadata on photos posted inside the article.
  * 2. Blocking unsafe non-HTTP protocols and private/loopback IP ranges (`validatePublicArticleUrl`).
- * 3. Extracting clean titles and body text from raw HTML (`extractReadableArticleFromHtml`).
+ * 3. Extracting clean titles, body text, and lead image URLs from raw HTML (`extractReadableArticleFromHtml`).
  */
 
 import { APP_CONFIG } from '../../config/appConfig';
-import { CreatorPlatform, CreatorPost } from '../../domain/privacyTypes';
+import {
+  CreatorPlatform,
+  CreatorPost,
+  ExifPrivacyScanSummary,
+} from '../../domain/privacyTypes';
 import { logFunctionCall } from '../../logging/logger';
+import { scanImageBytesForExifPrivacy } from '../exif-scanner/exifMetadataScanner';
+import { stripBinaryMetadataFromBytes } from '../exif-scanner/exifMetadataStripper';
 
 /**
  * Extracted readable content parsed from an HTML blog or newsletter page.
@@ -28,6 +43,7 @@ export interface ExtractedArticleContent {
   readonly title: string;
   readonly bodyText: string;
   readonly detectedPlatform: Extract<CreatorPlatform, 'substack' | 'blog'>;
+  readonly leadImageUrl?: string;
 }
 
 /**
@@ -36,7 +52,13 @@ export interface ExtractedArticleContent {
 export type HttpFetchFn = (
   input: string,
   init?: RequestInit,
-) => Promise<{ ok: boolean; status: number; text: () => Promise<string> }>;
+) => Promise<{
+  ok: boolean;
+  status: number;
+  headers?: { get?: (name: string) => string | null };
+  text: () => Promise<string>;
+  arrayBuffer?: () => Promise<ArrayBuffer>;
+}>;
 
 const PRIVATE_HOSTNAME_PATTERNS: readonly RegExp[] = [
   /^localhost$/i,
@@ -50,10 +72,10 @@ const PRIVATE_HOSTNAME_PATTERNS: readonly RegExp[] = [
 ];
 
 /**
- * Validates that a user-supplied article URL uses `http:` or `https:` and does not
+ * Validates that a user-supplied URL uses `http:` or `https:` and does not
  * target loopback, link-local, or private network hosts (SSRF protection).
  *
- * @param rawUrl - Raw URL string entered by the creator.
+ * @param rawUrl - Raw URL string entered by the creator or resolved from an article `<img>`.
  * @returns Normalized `URL` object when valid and public.
  * @throws {Error} When the URL is malformed, uses a disallowed protocol, or targets a private host.
  */
@@ -124,8 +146,51 @@ export function detectArticlePlatform(
 }
 
 /**
+ * Extracts and validates a public lead image URL from `<article><img src="...">` or
+ * `<meta property="og:image">` markup, ignoring private/loopback or data/svg icons.
+ *
+ * @param focusHtml - Primary `<article>` / `<main>` HTML region.
+ * @param fullHtml - Bounded full page HTML for `og:image` fallback.
+ * @param baseUrl - Validated article `URL` used to resolve relative image paths.
+ * @returns Validated public image URL string, or `undefined` if none found.
+ */
+export function extractLeadArticleImageUrl(
+  focusHtml: string,
+  fullHtml: string,
+  baseUrl: URL,
+): string | undefined {
+  logFunctionCall('extractLeadArticleImageUrl', {
+    baseHostname: baseUrl.hostname,
+  });
+
+  const inlineImgMatch = /<img[^>]+src=["']([^"']+)["']/i.exec(focusHtml);
+  const ogImageMatch =
+    /<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i.exec(
+      fullHtml,
+    );
+
+  const rawCandidate = inlineImgMatch?.[1] ?? ogImageMatch?.[1];
+  if (!rawCandidate) {
+    return undefined;
+  }
+
+  const decodedSrc = decodeBasicHtmlEntities(rawCandidate.trim());
+  if (decodedSrc.startsWith('data:') || /\.svg(\?|$)/i.test(decodedSrc)) {
+    return undefined;
+  }
+
+  try {
+    const resolved = new URL(decodedSrc, baseUrl);
+    const safeUrl = validatePublicArticleUrl(resolved.toString());
+    return safeUrl.toString();
+  } catch {
+    return undefined;
+  }
+}
+
+/**
  * Strips scripts, styles, navigation chrome, and HTML tags from raw article markup
- * to return a clean title and bounded readable body text.
+ * to return a clean title, bounded readable body text, and optional lead image URL.
  *
  * @param html - Raw HTML string downloaded from the article URL.
  * @param sourceUrl - Validated `URL` used for platform detection and fallback title.
@@ -155,6 +220,11 @@ export function extractReadableArticleFromHtml(
   const articleRegionMatch = /<article[^>]*>([\s\S]*?)<\/article>/i.exec(boundedHtml);
   const mainRegionMatch = /<main[^>]*>([\s\S]*?)<\/main>/i.exec(boundedHtml);
   const focusHtml = articleRegionMatch?.[1] ?? mainRegionMatch?.[1] ?? boundedHtml;
+  const leadImageUrl = extractLeadArticleImageUrl(
+    focusHtml,
+    boundedHtml,
+    sourceUrl,
+  );
 
   const withoutNonContentTags = focusHtml
     .replace(/<script[\s\S]*?<\/script>/gi, ' ')
@@ -176,16 +246,87 @@ export function extractReadableArticleFromHtml(
     title: cleanTitle || sourceUrl.hostname,
     bodyText: normalizedBody,
     detectedPlatform: detectArticlePlatform(sourceUrl, boundedHtml),
+    leadImageUrl,
   };
 }
 
 /**
- * Fetches a public blog or Substack URL, extracts its readable text, and returns a
+ * Best-effort fetcher that downloads an article's embedded photo, scans its binary
+ * headers for hidden EXIF GPS & capture-time metadata, and returns a stripped base64
+ * `imageDataUrl` + `exifScanSummary`. Gracefully returns `null` if image fetch fails.
+ */
+async function fetchAndInspectArticleLeadImage(
+  imageUrl: string,
+  fetchImpl: HttpFetchFn,
+  signal: AbortSignal,
+): Promise<{
+  readonly imageDataUrl: string;
+  readonly mediaMimeType: string;
+  readonly exifScanSummary: ExifPrivacyScanSummary;
+} | null> {
+  logFunctionCall('fetchAndInspectArticleLeadImage', { imageUrl });
+
+  try {
+    const imgRes = await fetchImpl(imageUrl, {
+      headers: {
+        'User-Agent': APP_CONFIG.articleImport.userAgent,
+        Accept: 'image/jpeg,image/png,image/webp,image/*;q=0.8',
+      },
+      signal,
+    });
+
+    if (!imgRes.ok || typeof imgRes.arrayBuffer !== 'function') {
+      return null;
+    }
+
+    const arrayBuf = await imgRes.arrayBuffer();
+    if (arrayBuf.byteLength < 12 || arrayBuf.byteLength > 10 * 1024 * 1024) {
+      return null;
+    }
+
+    const rawBytes = new Uint8Array(arrayBuf);
+    const rawScan = scanImageBytesForExifPrivacy(rawBytes);
+    const stripped = APP_CONFIG.exif.autoStripOnClientUpload
+      ? stripBinaryMetadataFromBytes(rawBytes)
+      : { bytes: rawBytes, strippedSegmentsCount: 0 };
+
+    const headerMime = imgRes.headers?.get?.('content-type')?.split(';')[0]?.trim();
+    const inferredMime =
+      rawScan.scannedFormat === 'png'
+        ? 'image/png'
+        : rawScan.scannedFormat === 'webp'
+          ? 'image/webp'
+          : headerMime && headerMime.startsWith('image/')
+            ? headerMime
+            : 'image/jpeg';
+
+    const base64Str = Buffer.from(
+      stripped.bytes.buffer,
+      stripped.bytes.byteOffset,
+      stripped.bytes.byteLength,
+    ).toString('base64');
+
+    return {
+      imageDataUrl: `data:${inferredMime};base64,${base64Str}`,
+      mediaMimeType: inferredMime,
+      exifScanSummary: {
+        ...rawScan,
+        metadataWasAutoStripped: stripped.strippedSegmentsCount > 0,
+      },
+    };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Fetches a public blog or Substack URL, extracts its readable text, inspects any
+ * embedded lead photo for hidden EXIF GPS/timestamp metadata, and returns a
  * standardized `CreatorPost` item ready for cross-platform privacy analysis.
  *
  * @param rawUrl - Public article URL provided by the creator.
  * @param fetchImpl - Optional fetch implementation override (defaults to global `fetch`).
- * @returns Resolved `CreatorPost` representing the written article.
+ * @returns Resolved `CreatorPost` representing the written article and optional photo.
  */
 export async function fetchAndExtractArticlePost(
   rawUrl: string,
@@ -224,14 +365,35 @@ export async function fetchAndExtractArticlePost(
       );
     }
 
+    const inspectedImage = extracted.leadImageUrl
+      ? await fetchAndInspectArticleLeadImage(
+          extracted.leadImageUrl,
+          fetchImpl,
+          controller.signal,
+        )
+      : null;
+
+    let postedAtLabel = `Imported from ${validatedUrl.hostname}`;
+    if (inspectedImage?.exifScanSummary.hasEmbeddedGps) {
+      postedAtLabel = `Imported from ${validatedUrl.hostname} · Article photo has hidden EXIF GPS & timestamp`;
+    } else if (
+      inspectedImage?.exifScanSummary.hasCaptureTimestamp &&
+      inspectedImage.exifScanSummary.captureTimeWindowCue
+    ) {
+      postedAtLabel = `Imported from ${validatedUrl.hostname} · Article photo EXIF: ${inspectedImage.exifScanSummary.captureTimeWindowCue}`;
+    }
+
     return {
       id: `article-${Date.now()}`,
       platform: extracted.detectedPlatform,
       title: extracted.title,
       caption: extracted.bodyText,
-      postedAtLabel: `Imported from ${validatedUrl.hostname}`,
+      postedAtLabel,
       isDraft: false,
       sourceUrl: validatedUrl.toString(),
+      imageDataUrl: inspectedImage?.imageDataUrl,
+      mediaMimeType: inspectedImage?.mediaMimeType,
+      exifScanSummary: inspectedImage?.exifScanSummary,
       mediaAltDescription: `Imported ${extracted.detectedPlatform} article: ${extracted.title}`,
     };
   } finally {

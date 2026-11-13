@@ -1,22 +1,28 @@
 /**
  * @file src/features/post-scan/postScanner.ts
- * @description Stage 1 multimodal per-post and article disclosure extractor powered by
- * Google Gemini (`@google/genai`).
+ * @description Stage 1 multimodal per-post, article, and binary EXIF metadata disclosure
+ * extractor powered by Google Gemini (`@google/genai`) + deterministic TIFF/XMP scanning.
  *
  * Feature Overview:
- * Analyzes an individual `CreatorPost`—combining original camera-roll image bytes
- * (`inlineData`), caption/article prose, platform context, and timing metadata—to
- * extract structured `PostDisclosureClue` records. When sensitive visual objects
- * (shipping labels, apartment mail, hotel keycards, VIP credentials, street signs)
- * appear in an image, Gemini returns normalized `[ymin, xmin, ymax, xmax]` coordinates
- * (`0..1000`) so the Fix Studio can automatically highlight and blur them.
+ * Analyzes an individual `CreatorPost`—combining:
+ *   1. Binary EXIF/TIFF/XMP header inspection (`scanImageDataUrlForExifPrivacy`) to flag
+ *      hidden GPS coordinates, capture timestamps, and camera serial tags inside raw
+ *      camera-roll files without ever echoing raw coordinates.
+ *   2. Original camera-roll image pixels (`inlineData`), caption/article prose, platform
+ *      context, and timing metadata via Google Gemini (`gemini-3.8-flash`).
+ *
+ * When sensitive visual objects (shipping labels, apartment mail, hotel keycards, VIP
+ * credentials, street signs, mirror/screen reflections) appear in an image, Gemini returns
+ * normalized `[ymin, xmin, ymax, xmax]` coordinates (`0..1000`) so the Fix Studio can
+ * automatically highlight and blur them while stripping all EXIF headers on export.
  *
  * Includes a deterministic heuristic fallback (`buildHeuristicPostFinding`) when no
  * API key is configured or venue Wi-Fi drops, ensuring uninterrupted demo reliability
  * while logging `usedFallback: true` in `INFO` GenAI telemetry.
  *
  * Primary Use Cases:
- * 1. Scanning uploaded Android/Mac camera-roll photos + captions for visual PII and routines.
+ * 1. Scanning uploaded Android/iOS/Mac camera-roll photos + captions for hidden EXIF GPS,
+ *    visual PII, and recurring routines.
  * 2. Scanning imported Substack/blog articles for recurring schedule or neighborhood disclosures.
  * 3. Batch-scanning an entire creator feed (`scanCreatorPostsBatch`).
  */
@@ -26,6 +32,7 @@ import { APP_CONFIG } from '../../config/appConfig';
 import {
   CreatorPost,
   DisclosureCategory,
+  ExifPrivacyScanSummary,
   PostDisclosureClue,
   PostDisclosureFinding,
 } from '../../domain/privacyTypes';
@@ -36,6 +43,11 @@ import {
   hasConfiguredGeminiApiKey,
 } from '../../genai/geminiClient';
 import { logFunctionCall, logGenAiCall } from '../../logging/logger';
+import {
+  buildExifDisclosureClues,
+  mergeExifScanSummaries,
+  scanImageDataUrlForExifPrivacy,
+} from '../exif-scanner/exifMetadataScanner';
 
 interface RawModelScanResponse {
   clues?: Array<{
@@ -56,16 +68,16 @@ interface RawModelScanResponse {
 }
 
 const POST_SCAN_SYSTEM_INSTRUCTION = `You are Stage 1 of Unseen, a defensive privacy self-auditor for women creators.
-Inspect the creator's own photo (if attached), caption/article text, and timestamp.
+Inspect the creator's own photo (if attached), binary EXIF metadata summary (if detected), caption/article text, and timestamp.
 Identify unintended privacy disclosures across these categories ONLY:
-- predictable_routine (recurring days/times, habitual cafés, gyms, studios)
+- predictable_routine (recurring days/times, habitual cafés, gyms, studios, or hidden EXIF capture-time patterns)
 - real_time_location ("right now", live set/event cues, active check-ins)
-- sensitive_document_or_pii (visible shipping labels, mail, barcodes, IDs, event badges, screens)
+- sensitive_document_or_pii (hidden EXIF GPS headers, visible shipping labels, mail, barcodes, IDs, event badges, laptop/mirror reflections)
 - travel_or_lodging_clue (hotel keycard sleeves, room/floor cues, Wi-Fi codes)
 - recognizable_surroundings (distinctive exterior signage, awnings, street-level windows)
 
 CRITICAL SAFETY RULES:
-1. NEVER repeat or output exact street addresses, apartment numbers, hotel room numbers, or GPS coordinates in your summary or labels. Describe the OBJECT TYPE instead (e.g., "Visible parcel shipping label with residential address in lower-right corner").
+1. NEVER repeat or output exact street addresses, apartment numbers, hotel room numbers, venue names, or GPS coordinates in your summary or labels. Describe the OBJECT OR METADATA TYPE instead (e.g., "Visible parcel shipping label with residential address in lower-right corner" or "Hidden EXIF GPS location header embedded in raw photo file").
 2. Whenever a visual object should be blurred/cropped (mail, label, keycard, wristband, street sign), return a boundingBox in normalized 0..1000 coordinates [ymin, xmin, ymax, xmax].`;
 
 const POST_SCAN_RESPONSE_SCHEMA: Schema = {
@@ -114,17 +126,105 @@ const POST_SCAN_RESPONSE_SCHEMA: Schema = {
 };
 
 /**
- * Builds multimodal `@google/genai` `Part[]` contents for a single `CreatorPost`.
+ * Resolves the complete zero-PII EXIF metadata summary for a `CreatorPost` by combining
+ * live byte inspection of `post.imageDataUrl` with any pre-upload `post.exifScanSummary`.
+ *
+ * @param post - Creator photo post, draft, or imported article.
+ * @returns Merged `ExifPrivacyScanSummary`.
+ */
+export function resolvePostExifSummary(
+  post: CreatorPost,
+): ExifPrivacyScanSummary {
+  logFunctionCall('resolvePostExifSummary', {
+    postId: post.id,
+    hasImageDataUrl: Boolean(post.imageDataUrl),
+    hasPreUploadExif: Boolean(post.exifScanSummary),
+  });
+
+  const liveScan = scanImageDataUrlForExifPrivacy(post.imageDataUrl);
+  return mergeExifScanSummaries(liveScan, post.exifScanSummary);
+}
+
+/**
+ * Merges deterministic binary EXIF clues with Gemini's multimodal clues while preventing
+ * duplicate EXIF GPS or EXIF capture-time entries when the model also mentions them.
+ *
+ * @param modelClues - Clues returned by Gemini (or heuristic text/visual rules).
+ * @param exifClues - Deterministic clues generated from binary EXIF headers.
+ * @returns Combined, deduplicated `PostDisclosureClue[]` list.
+ */
+export function mergeExifCluesIntoModelClues(
+  modelClues: readonly PostDisclosureClue[],
+  exifClues: readonly PostDisclosureClue[],
+): PostDisclosureClue[] {
+  logFunctionCall('mergeExifCluesIntoModelClues', {
+    modelClueCount: modelClues.length,
+    exifClueCount: exifClues.length,
+  });
+
+  if (exifClues.length === 0) {
+    return [...modelClues];
+  }
+
+  const hasExifGpsDeterministic = exifClues.some(
+    (c) =>
+      c.category === 'sensitive_document_or_pii' &&
+      /exif\s+gps/i.test(c.summary),
+  );
+  const hasExifTimestampDeterministic = exifClues.some(
+    (c) =>
+      c.category === 'predictable_routine' &&
+      /exif\s+capture-time/i.test(c.summary),
+  );
+
+  const filteredModelClues = modelClues.filter((clue) => {
+    if (clue.boundingBox) {
+      return true;
+    }
+    if (
+      hasExifGpsDeterministic &&
+      /exif/i.test(clue.summary) &&
+      /gps|coordinate/i.test(clue.summary)
+    ) {
+      return false;
+    }
+    if (
+      hasExifTimestampDeterministic &&
+      /exif/i.test(clue.summary) &&
+      /timestamp|capture/i.test(clue.summary)
+    ) {
+      return false;
+    }
+    return true;
+  });
+
+  return [...exifClues, ...filteredModelClues];
+}
+
+/**
+ * Builds multimodal `@google/genai` `Part[]` contents for a single `CreatorPost`,
+ * including zero-PII EXIF binary summary context when embedded metadata is present.
  *
  * @param post - Creator photo post, draft, or imported blog/Substack article.
+ * @param exifSummary - Optional pre-computed `ExifPrivacyScanSummary`.
  * @returns Ordered array of prompt text and optional `inlineData` image part.
  */
-export function buildPostScanParts(post: CreatorPost): Part[] {
+export function buildPostScanParts(
+  post: CreatorPost,
+  exifSummary?: ExifPrivacyScanSummary,
+): Part[] {
+  const resolvedExif = exifSummary ?? resolvePostExifSummary(post);
+
   logFunctionCall('buildPostScanParts', {
     postId: post.id,
     platform: post.platform,
     hasImage: Boolean(post.imageDataUrl),
+    hasExifMetadata: resolvedExif.hasExifMetadata,
   });
+
+  const exifPromptNote = resolvedExif.hasExifMetadata
+    ? `Hidden EXIF Binary Metadata Detected: Embedded GPS coordinates = ${resolvedExif.hasEmbeddedGps}, Capture time window = ${resolvedExif.captureTimeWindowCue ?? 'none'}, Camera header = ${resolvedExif.deviceCategoryCue ?? 'none'}, Unique serial/ID tag = ${resolvedExif.hasUniqueSerialOrId}`
+    : '';
 
   const parts: Part[] = [
     {
@@ -134,6 +234,7 @@ export function buildPostScanParts(post: CreatorPost): Part[] {
         `Is Unpublished Draft: ${post.isDraft}`,
         `Timestamp / Context: ${post.postedAtLabel}`,
         post.title ? `Title: ${post.title}` : '',
+        exifPromptNote,
         `Caption or Article Text:\n${post.caption}`,
       ]
         .filter(Boolean)
@@ -155,8 +256,8 @@ export function buildPostScanParts(post: CreatorPost): Part[] {
  * Deterministic offline/fallback analyzer for Maya's demo feed and arbitrary custom
  * camera-roll/article uploads when live Gemini connectivity is unavailable.
  *
- * @param post - Input `CreatorPost` to inspect heuristically.
- * @returns Structured `PostDisclosureFinding` with accurate bounding boxes and clues.
+ * @param post - Input `CreatorPost` to inspect heuristically (including binary EXIF).
+ * @returns Structured `PostDisclosureFinding` with accurate bounding boxes and EXIF clues.
  */
 export function buildHeuristicPostFinding(
   post: CreatorPost,
@@ -166,15 +267,18 @@ export function buildHeuristicPostFinding(
     platform: post.platform,
   });
 
+  const exifSummary = resolvePostExifSummary(post);
+  const exifClues = buildExifDisclosureClues(exifSummary);
+
   const combinedText = `${post.title ?? ''} ${post.caption} ${post.postedAtLabel} ${post.mediaAltDescription}`.toLowerCase();
-  const clues: PostDisclosureClue[] = [];
+  const heuristicClues: PostDisclosureClue[] = [];
 
   if (
     /every\s+(monday|tuesday|wednesday|thursday|friday|saturday|sunday)|ritual|8:15am|9am|8\s*to\s*9am|weekly/i.test(
       combinedText,
     )
   ) {
-    clues.push({
+    heuristicClues.push({
       category: 'predictable_routine',
       summary:
         'Discloses a recurring weekday morning routine linking a neighborhood café and nearby fitness studio.',
@@ -186,7 +290,7 @@ export function buildHeuristicPostFinding(
   }
 
   if (/shipping label|parcel|in the mail|envelope/i.test(combinedText)) {
-    clues.push({
+    heuristicClues.push({
       category: 'sensitive_document_or_pii',
       summary:
         'Visible parcel shipping label in the lower-right corner exposes recipient name and residential delivery details.',
@@ -204,7 +308,7 @@ export function buildHeuristicPostFinding(
   }
 
   if (/hotel|checked in|6th floor|keycard|suitcase/i.test(combinedText)) {
-    clues.push({
+    heuristicClues.push({
       category: 'travel_or_lodging_clue',
       summary:
         'Active hotel check-in post includes a visible printed keycard sleeve and floor reference while still staying on property.',
@@ -223,7 +327,7 @@ export function buildHeuristicPostFinding(
   }
 
   if (/right now|until 8pm|come say hi|wristband|live set/i.test(combinedText)) {
-    clues.push({
+    heuristicClues.push({
       category: 'real_time_location',
       summary:
         'Draft announces real-time presence at an active rooftop venue while displaying an artist VIP access credential.',
@@ -244,10 +348,11 @@ export function buildHeuristicPostFinding(
   }
 
   if (
-    clues.length === 0 &&
+    heuristicClues.length === 0 &&
+    exifClues.length === 0 &&
     /window|awning|archway|street|block|entrance/i.test(combinedText)
   ) {
-    clues.push({
+    heuristicClues.push({
       category: 'recognizable_surroundings',
       summary:
         'Exterior architectural features and signage in the background could narrow down a frequented block.',
@@ -260,13 +365,13 @@ export function buildHeuristicPostFinding(
   const finding: PostDisclosureFinding = {
     postId: post.id,
     platform: post.platform,
-    clues,
+    clues: mergeExifCluesIntoModelClues(heuristicClues, exifClues),
   };
 
   logGenAiCall({
     stage: `Stage1_PostMultimodalScan[${post.id}]`,
     model: APP_CONFIG.genai.postScanModel,
-    prompt: buildPostScanParts(post),
+    prompt: buildPostScanParts(post, exifSummary),
     config: {
       temperature: APP_CONFIG.genai.postScanTemperature,
       fallbackReason: 'Missing API key or offline fallback active',
@@ -280,11 +385,11 @@ export function buildHeuristicPostFinding(
 }
 
 /**
- * Runs Stage 1 multimodal disclosure extraction on a single `CreatorPost`.
+ * Runs Stage 1 multimodal + binary EXIF disclosure extraction on a single `CreatorPost`.
  *
  * @param post - Creator post, camera-roll image, or imported article to scan.
  * @param executor - Optional injectable Gemini executor for deterministic tests.
- * @returns Structured `PostDisclosureFinding` with clues and optional bounding boxes.
+ * @returns Structured `PostDisclosureFinding` with EXIF + visual/prose clues and bounding boxes.
  */
 export async function scanSingleCreatorPost(
   post: CreatorPost,
@@ -297,6 +402,8 @@ export async function scanSingleCreatorPost(
     imageDataUrl: post.imageDataUrl,
   });
 
+  const exifSummary = resolvePostExifSummary(post);
+  const exifClues = buildExifDisclosureClues(exifSummary);
   const canCallLiveModel = Boolean(executor) || hasConfiguredGeminiApiKey();
 
   if (!canCallLiveModel && APP_CONFIG.genai.enableDemoFallbackOnMissingKey) {
@@ -307,7 +414,7 @@ export async function scanSingleCreatorPost(
   }
 
   try {
-    const contents = buildPostScanParts(post);
+    const contents = buildPostScanParts(post, exifSummary);
     const parsed = await generateStructuredJson<RawModelScanResponse>(
       {
         stage: `Stage1_PostMultimodalScan[${post.id}]`,
@@ -324,7 +431,7 @@ export async function scanSingleCreatorPost(
       finding: {
         postId: post.id,
         platform: post.platform,
-        clues: parsed.clues ?? [],
+        clues: mergeExifCluesIntoModelClues(parsed.clues ?? [], exifClues),
       },
       usedFallback: false,
     };
@@ -340,7 +447,7 @@ export async function scanSingleCreatorPost(
 }
 
 /**
- * Runs Stage 1 multimodal extraction across a batch of `CreatorPost` items in parallel.
+ * Runs Stage 1 multimodal + EXIF extraction across a batch of `CreatorPost` items in parallel.
  *
  * @param posts - Collection of creator photos, drafts, and imported articles.
  * @param executor - Optional injectable Gemini executor for testing.

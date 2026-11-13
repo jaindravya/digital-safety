@@ -275,7 +275,21 @@ export function buildFallbackFixPlan(
     };
   })();
 
-  const safePlan = enforceFixPlanAntiDoxxing(planByCategory);
+  const hasExifClue =
+    Boolean(post.exifScanSummary?.hasExifMetadata) ||
+    post.postedAtLabel.toLowerCase().includes('exif');
+
+  const planWithExifStep: SafePostFixPlan = hasExifClue
+    ? {
+        ...planByCategory,
+        plainLanguageChecklist: [
+          ...planByCategory.plainLanguageChecklist,
+          'Download the protected PNG export so hidden EXIF GPS & capture-time headers remain completely stripped',
+        ],
+      }
+    : planByCategory;
+
+  const safePlan = enforceFixPlanAntiDoxxing(planWithExifStep);
 
   logGenAiCall({
     stage: `Stage3_VoicePreservingFixPlan[${post.id}]`,
@@ -343,6 +357,21 @@ export async function generateSafePostFixPlan(params: {
       params.executor,
     );
 
+    const hasExifMetadata =
+      Boolean(params.post.exifScanSummary?.hasExifMetadata) ||
+      Boolean(
+        params.postFinding?.clues.some((c) => /exif/i.test(c.summary)),
+      );
+    const rawChecklist = parsed.plainLanguageChecklist ?? [];
+    const enrichedChecklist =
+      hasExifMetadata &&
+      !rawChecklist.some((item) => /exif/i.test(item))
+        ? [
+            ...rawChecklist,
+            'Export clean PNG from Fix Studio so hidden EXIF GPS & capture-time headers remain completely stripped',
+          ]
+        : rawChecklist;
+
     const candidatePlan: SafePostFixPlan = {
       postId: params.post.id,
       riskId: params.risk.id,
@@ -351,7 +380,7 @@ export async function generateSafePostFixPlan(params: {
       timingRecommendation:
         parsed.timingRecommendation ??
         'Publish after leaving the location and stagger routine days.',
-      plainLanguageChecklist: parsed.plainLanguageChecklist ?? [],
+      plainLanguageChecklist: enrichedChecklist,
     };
 
     return enforceFixPlanAntiDoxxing(candidatePlan);

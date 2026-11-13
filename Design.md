@@ -60,7 +60,7 @@ To ship a native **macOS Desktop Studio App** today while keeping a zero-rewrite
 
 ### 3.7 Blog & Substack Article Importer (`src/features/article-import/articleExtractor.ts`) — *Implemented*
 - Validates public `http`/`https` article links while blocking loopback and private network SSRF targets (`localhost`, `127.*`, `10.*`, `192.168.*`, `169.254.*`).
-- Strips scripts, styles, and navigation chrome from HTML to extract clean titles and prose, packaging newsletters/blogs into `CreatorPost` items for cross-platform routine detection alongside camera-roll photos.
+- Strips scripts, styles, and navigation chrome from HTML to extract clean titles, prose, and embedded lead photos (`<article><img ...>` / `og:image`), inspecting article photos for hidden EXIF GPS & capture-time metadata and packaging everything into `CreatorPost` items for cross-platform detection alongside camera-roll photos.
 
 ### 3.8 3-Stage Gemini Multimodal Engine & Deterministic Scorer (`src/genai/` & `src/features/`) — *Implemented*
 - **Gemini Client (`src/genai/geminiClient.ts`):** Wraps `@google/genai` structured JSON generation, converts base64 data URLs to `inlineData` parts, and automatically logs every call via `logGenAiCall` with `inlineData` stripped.
@@ -76,8 +76,8 @@ To ship a native **macOS Desktop Studio App** today while keeping a zero-rewrite
 - **Installable Android & iOS PWA (`public/manifest.webmanifest`, `public/sw.js`, `public/icons/`):** Enables native "Install App" on Android Chrome with custom `192×192` and `512×512` icons while intentionally never caching sensitive `/api/*` payloads.
 
 ### 3.10 Retro + Robinhood Creator Studio & Android Mobile UI (`src/ui/` & `src/features/`) — *Implemented*
-- **Camera Roll Validator & Reader (`src/features/upload/cameraRollReader.ts`):** Validates original image uploads (`JPG`, `PNG`, `WebP`, `HEIC` up to `20MB`) and rejects videos with a friendly V1 roadmap message.
-- **Canvas Smart Redactor (`src/features/image-redactor/canvasImageRedactor.ts`):** Maps Gemini `0..1000` `[ymin, xmin, ymax, xmax]` boxes to image pixel space and renders irreversible pixelation + Gaussian blur with local PNG export.
+- **Camera Roll Validator & Reader (`src/features/upload/cameraRollReader.ts`):** Validates original image uploads (`JPG`, `PNG`, `WebP`, `HEIC` up to `20MB`), rejects videos with a friendly V1 roadmap message, scans raw photo headers for hidden EXIF GPS/capture metadata, and auto-strips raw EXIF segments locally in memory.
+- **Canvas Smart Redactor (`src/features/image-redactor/canvasImageRedactor.ts`):** Maps Gemini `0..1000` `[ymin, xmin, ymax, xmax]` boxes to image pixel space, renders irreversible pixelation + Gaussian blur, and guarantees 100% EXIF/GPS/XMP removal on export even when zero visual blur boxes are drawn.
 - **Checklist Exporter (`src/features/best-practices/checklistExporter.ts`):** Formats and downloads personalized + general digital safety checklists locally with zero server storage.
 - **Interactive UI Screens (`src/ui/components/`):**
   - `ConsentBannerCard.tsx`: Self-audit T&C ownership gate.
@@ -86,5 +86,10 @@ To ship a native **macOS Desktop Studio App** today while keeping a zero-rewrite
   - `SafeFixStudioModal.tsx`: Side-by-side Before/After Smart Blur + custom creator drag-box oversight + 3 Gemini voice-preserving caption rewrites + safe timing badge.
   - `BestPracticesView.tsx`: Ephemeral session checkboxes + 1-tap download.
 
-### 3.11 Live AI Observability Drawer & Final Demo Polish — *Planned (Chunk 6)*
+### 3.11 Hidden Photo Metadata (EXIF GPS & Capture Time) Scanner & Stripper (`src/features/exif-scanner/`) — *Implemented*
+- **Binary TIFF/IFD Parser (`tiffIfdParser.ts`):** Walks little-endian (`II`) and big-endian (`MM`) TIFF `IFD0`, `ExifIFD` (`0x8769`), and `GPSInfoIFD` (`0x8825`) directories with strict bounds validation. Verifies non-zero rational `GPSLatitude`/`GPSLongitude` components without ever computing or logging raw decimal coordinates, abstracts `DateTimeOriginal` into weekday + part-of-day routine windows, classifies camera hardware headers generically, and flags serial/owner tags (`0xA430`, `0xA431`, `0xA420`) without echoing unique identifiers.
+- **Multi-Format EXIF & XMP Scanner (`exifMetadataScanner.ts`):** Inspects JPEG (`APP1` EXIF & Adobe XMP), PNG (`eXIf`, `iTXt`, `tEXt`), WebP (`EXIF`, `XMP `), and HEIC/HEIF (`Exif` box) binary headers in Stage 1 (`postScanner.ts`) and `POST /api/scan-exif`, emitting deterministic `high`-priority `PostDisclosureClue` items that feed into Stage 2 cross-platform routine correlation and `0–100` Exposure Scoring.
+- **Lossless Binary EXIF Stripper (`exifMetadataStripper.ts`):** Excises `APP1`/IPTC/comment segments from JPEGs, `eXIf`/text chunks from PNGs, and `EXIF`/`XMP ` chunks from WebP containers losslessly across both browser/PWA and Node runtimes.
+
+### 3.12 Live AI Observability Drawer & Final Demo Polish — *Planned*
 - Transparent slide-out `INFO` Function & GenAI Audit Log inspector (`inlineData` stripped) + Responsible AI limitations summary.

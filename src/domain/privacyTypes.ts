@@ -55,6 +55,32 @@ export interface NormalizedBoundingBox {
 }
 
 /**
+ * Categories of hidden binary EXIF/XMP metadata detected inside raw photo files.
+ */
+export type ExifMetadataFieldKind =
+  | 'gps_coordinates'
+  | 'capture_timestamp'
+  | 'device_make_model'
+  | 'hardware_serial';
+
+/**
+ * Privacy-safe summary of binary EXIF/TIFF/XMP metadata found inside an uploaded photo.
+ * Deliberately excludes raw GPS coordinates, exact timestamps, or serial strings.
+ */
+export interface ExifPrivacyScanSummary {
+  readonly scannedFormat: 'jpeg' | 'png' | 'webp' | 'heic' | 'unknown';
+  readonly hasExifMetadata: boolean;
+  readonly hasEmbeddedGps: boolean;
+  readonly hasCaptureTimestamp: boolean;
+  readonly captureTimeWindowCue?: string;
+  readonly hasDeviceMakeOrModel: boolean;
+  readonly deviceCategoryCue?: string;
+  readonly hasUniqueSerialOrId: boolean;
+  readonly metadataWasAutoStripped: boolean;
+  readonly detectedFields: readonly ExifMetadataFieldKind[];
+}
+
+/**
  * Represents a creator-owned camera-roll photo, published post, imported blog/Substack
  * article, or unpublished draft submitted for self-audit.
  */
@@ -70,6 +96,7 @@ export interface CreatorPost {
   readonly mediaAssetPath?: string;
   readonly mediaMimeType?: string;
   readonly mediaAltDescription: string;
+  readonly exifScanSummary?: ExifPrivacyScanSummary;
 }
 
 /**

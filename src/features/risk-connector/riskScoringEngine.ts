@@ -68,7 +68,7 @@ const CATEGORY_PERSONALIZED_TIPS: Readonly<
     id: 'tip-visible-pii',
     title: 'Blur or crop parcel labels, mail, and ID badges',
     description:
-      'High-resolution camera-roll photos let viewers zoom in on barcodes, apartment numbers, and shipping labels—use Smart Blur before posting.',
+      'High-resolution camera-roll photos let viewers zoom in on barcodes, mail, and badges—and raw files embed hidden EXIF GPS coordinates. Export clean EXIF-stripped PNGs and apply Smart Blur before posting.',
     kind: 'personalized',
     triggeredByCategory: 'sensitive_document_or_pii',
   },
