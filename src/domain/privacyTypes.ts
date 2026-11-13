@@ -203,3 +203,54 @@ export interface PrivacyAuditReport {
   readonly limitationsNotice: string;
   readonly usedDemoFallback: boolean;
 }
+
+/**
+ * Perceptual JND (Just-Noticeable-Difference) perturbation strength preset
+ * for the Screenshot-Resilient Anti-Deepfake Shield.
+ */
+export type DeepfakeShieldMode = 'stealth' | 'balanced' | 'max';
+
+/**
+ * Quantitative human-perceptual fidelity and AI vision-encoder disruption metrics.
+ */
+export interface DeepfakeShieldMetrics {
+  readonly ssim: number;
+  readonly psnrDb: number;
+  readonly avgPixelShift255: number;
+  readonly clipAlignmentClean: number;
+  readonly clipAlignmentProtected: number;
+  readonly clipAlignmentCleanScreenshot: number;
+  readonly clipAlignmentProtectedScreenshot: number;
+}
+
+/**
+ * Result of probing a generative vision model (Gemini) with a style-transfer /
+ * likeness-cloning prompt ("Create the Studio Ghibli version of this person").
+ */
+export interface GeminiDeepfakeAttackProbe {
+  readonly targetLabel: 'clean_screenshot' | 'protected_screenshot';
+  readonly finishReason: string;
+  readonly extractedFacialFeaturesSummary: string;
+  readonly ghibliReconstructionAttempt: string;
+  readonly likenessCloned: boolean;
+}
+
+/**
+ * Complete evaluation and visual verification bundle produced by the Anti-Deepfake
+ * Screenshot-Resilient Shield.
+ */
+export interface DeepfakeShieldVerificationReport {
+  readonly mode: DeepfakeShieldMode;
+  readonly evaluatedAtIso: string;
+  readonly cleanImageUrl: string;
+  readonly protectedImageUrl: string;
+  readonly perturbationHeatmapUrl: string;
+  readonly cleanScreenshotUrl: string;
+  readonly protectedScreenshotUrl: string;
+  readonly comparisonGridUrl: string;
+  readonly metrics: DeepfakeShieldMetrics;
+  readonly cleanAttackProbe: GeminiDeepfakeAttackProbe;
+  readonly protectedAttackProbe: GeminiDeepfakeAttackProbe;
+  readonly shieldSucceeded: boolean;
+  readonly usedDemoFallback: boolean;
+}

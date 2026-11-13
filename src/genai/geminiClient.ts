@@ -95,16 +95,36 @@ export async function defaultSdkGenAiExecutor(
   }
 
   const ai = new GoogleGenAI({ apiKey });
-  const response = await ai.models.generateContent({
-    model: request.model,
-    contents: [...request.contents],
-    config: {
-      systemInstruction: request.systemInstruction,
-      temperature: request.temperature,
-      responseMimeType: 'application/json',
-      responseSchema: request.responseSchema,
-    },
-  });
+  const executeWithModel = async (modelName: string) =>
+    ai.models.generateContent({
+      model: modelName,
+      contents: [...request.contents],
+      config: {
+        systemInstruction: request.systemInstruction,
+        temperature: request.temperature,
+        responseMimeType: 'application/json',
+        responseSchema: request.responseSchema,
+      },
+    });
+
+  let response;
+  try {
+    response = await executeWithModel(request.model);
+  } catch (err) {
+    const errMsg = err instanceof Error ? err.message : String(err);
+    if (
+      request.model === 'gemini-2.5-flash' &&
+      (errMsg.includes('404') || errMsg.includes('NOT_FOUND') || errMsg.includes('no longer available'))
+    ) {
+      logFunctionCall('defaultSdkGenAiExecutor.modelFallback', {
+        fromModel: request.model,
+        toModel: 'gemini-3.8-flash',
+      });
+      response = await executeWithModel('gemini-3.8-flash');
+    } else {
+      throw err;
+    }
+  }
 
   if (!response.text) {
     throw new Error(`Gemini returned an empty response for stage ${request.stage}.`);
